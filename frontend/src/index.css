@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=Russo+One&family=Tajawal:wght@400;500;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  
+  html {
+    font-family: 'Inter', 'Tajawal', sans-serif;
+  }
+
+  html[dir="rtl"] {
+    font-family: 'Tajawal', 'Inter', sans-serif;
+  }
+
+  body {
+    background-color: #0a0c16;
+    color: #e2e8f0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0c16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a3254;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #7c3aed;
+}
+
+/* Thermal Receipt Print Stylesheet */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #thermal-receipt, #thermal-receipt * {
+    visibility: visible;
+  }
+  #thermal-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    margin: 0;
+    padding: 10px;
+    background: #fff !important;
+    color: #000 !important;
+    font-family: monospace !important;
+    font-size: 12px !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

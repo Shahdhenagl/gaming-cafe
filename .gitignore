@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+backend/vendor/
+frontend/node_modules/
+frontend/dist/
+
+# Environment files
+.env
+.env.backup
+.env.production
+backend/.env
+frontend/.env.local
+
+# Database
+backend/database/*.sqlite-journal
+
+# Vercel & IDE
+.vercel/
+.idea/
+.vscode/
+*.log
+
+# OS & Media files
+Thumbs.db
+.DS_Store
+/*.mp4
+/*.png
+/*.jpg
+/*.jpeg
+!frontend/public/**
+
