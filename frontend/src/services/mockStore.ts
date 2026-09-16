@@ -392,7 +392,13 @@ class MockStore {
   login(credentials: { email?: string; password?: string; pin?: string }): { token: string; user: User } {
     let found: User | undefined;
     if (credentials.pin) {
-      found = INITIAL_USERS.find((u) => u.pin_code === credentials.pin);
+      let managedUsers: User[] = [];
+      try {
+        managedUsers = JSON.parse(localStorage.getItem('al5al_admin_users') || '[]') as User[];
+      } catch {
+        managedUsers = [];
+      }
+      found = [...managedUsers, ...INITIAL_USERS].find((u) => u.pin_code === credentials.pin);
     } else if (credentials.email && credentials.password) {
       // Standalone mode has no password database; never authenticate by email alone.
       found = undefined;
