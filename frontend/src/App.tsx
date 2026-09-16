@@ -18,6 +18,7 @@ import { TableManagement } from './components/TableManagement';
 import { ShiftDashboard } from './components/ShiftDashboard';
 import { InventoryView } from './components/InventoryView';
 import { AdminDashboard } from './components/AdminDashboard';
+import { ManagementDashboard } from './components/ManagementDashboard';
 import { StartShiftModal } from './components/StartShiftModal';
 import { EndShiftModal } from './components/EndShiftModal';
 import { LoginModal } from './components/LoginModal';
@@ -33,7 +34,7 @@ export function App() {
   const t = translations[lang];
 
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState<'gaming' | 'pos' | 'tables' | 'shift' | 'inventory' | 'analytics'>('gaming');
+  const [activeTab, setActiveTab] = useState<'gaming' | 'pos' | 'tables' | 'shift' | 'inventory' | 'analytics' | 'management'>('gaming');
 
   // Core system data
   const [user, setUser] = useState<User | null>(null);
@@ -255,6 +256,7 @@ export function App() {
     { id: 'shift', label: t.navShift, icon: Clock },
     { id: 'inventory', label: t.navInventory, icon: Package },
     { id: 'analytics', label: t.navAnalytics, icon: BarChart3 },
+    { id: 'management', label: lang === 'ar' ? 'لوحة التحكم' : 'Management', icon: Users },
   ];
 
   return (
@@ -370,6 +372,9 @@ export function App() {
 
             {activeTab === 'analytics' && (
               <AdminDashboard lang={lang} />
+            )}
+            {activeTab === 'management' && (
+              <ManagementDashboard lang={lang} products={products} devices={devices} user={user} />
             )}
           </div>
         )}
