@@ -106,7 +106,7 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
                     {item.name_ar && <div className="text-[9px] text-gray-600">{item.name_ar}</div>}
                     <div className="flex justify-between text-[10px] text-gray-600 font-mono">
                       <span>{item.quantity} x {formatMoney(item.unit_price)}</span>
-                      <span className="font-bold text-black">{formatMoney(item.subtotal)} SAR</span>
+                      <span className="font-bold text-black">{formatMoney(item.subtotal)} {t.currency}</span>
                     </div>
                   </div>
                 ))}
@@ -117,21 +117,21 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
             <div className="py-2.5 border-b border-dashed border-gray-400 space-y-1 text-[11px] font-mono">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
-                <span>{formatMoney(receipt.subtotal)} SAR</span>
+                <span>{formatMoney(receipt.subtotal)} {t.currency}</span>
               </div>
               {safeNum(receipt.discount) > 0 && (
                 <div className="flex justify-between text-red-600 font-bold">
                   <span>Discount:</span>
-                  <span>-{formatMoney(receipt.discount)} SAR</span>
+                  <span>-{formatMoney(receipt.discount)} {t.currency}</span>
                 </div>
               )}
               <div className="flex justify-between text-gray-600 text-[10px]">
                 <span>VAT (Included 15%):</span>
-                <span>{formatMoney((safeNum(receipt.total_amount) * 15) / 115)} SAR</span>
+                <span>{formatMoney((safeNum(receipt.total_amount) * 14) / 114)} {t.currency}</span>
               </div>
               <div className="flex justify-between text-base font-black pt-1 border-t border-gray-400 font-mono">
                 <span>TOTAL:</span>
-                <span>{formatMoney(receipt.total_amount)} SAR</span>
+                <span>{formatMoney(receipt.total_amount)} {t.currency}</span>
               </div>
               <div className="flex justify-between text-[10px] text-gray-600">
                 <span>Payment:</span>

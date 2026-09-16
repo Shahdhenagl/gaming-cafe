@@ -836,6 +836,8 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                   {[
                     { id: 'cash', label: t.cash },
                     { id: 'visa', label: t.visa },
+                    { id: 'wallet', label: t.wallet },
+                    { id: 'instapay', label: t.instapay },
                   ].map((m) => (
                     <button
                       key={m.id}
