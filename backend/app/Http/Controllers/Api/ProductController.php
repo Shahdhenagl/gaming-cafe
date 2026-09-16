@@ -98,6 +98,14 @@ class ProductController extends Controller
         return response()->json(['message' => 'Product updated successfully', 'product' => $product]);
     }
 
+    public function destroy($id)
+    {
+        $product = Product::findOrFail($id);
+        $product->delete();
+
+        return response()->json(['message' => 'Product deleted successfully']);
+    }
+
     /**
      * Adjust product stock (Restock or Adjustment).
      */
