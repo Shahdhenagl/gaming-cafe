@@ -8,7 +8,7 @@
   :root {
     color-scheme: dark;
   }
-  
+
   html {
     font-family: 'Inter', 'Tajawal', sans-serif;
   }
@@ -32,46 +32,46 @@
   }
 }
 
+/* Light mode: high-contrast, readable office-friendly palette */
+html.light body { background: #f4f7fb; color: #172033; }
+html.light .bg-background,
+html.light [class*="bg-[#0a0c16]"],
+html.light [class*="bg-[#0c1022]"] { background-color: #ffffff !important; }
+html.light [class*="bg-surface"] { background-color: #eef2f7 !important; }
+html.light [class*="bg-card"] { background-color: #ffffff !important; }
+html.light [class*="border-border"] { border-color: #d6deea !important; }
+html.light [class*="text-slate-100"],
+html.light [class*="text-slate-200"],
+html.light [class*="text-white"] { color: #172033 !important; }
+html.light [class*="text-slate-300"] { color: #334155 !important; }
+html.light [class*="text-slate-400"],
+html.light [class*="text-slate-500"] { color: #64748b !important; }
+html.light [class*="hover\\:text-white"]:hover { color: #172033 !important; }
+html.light [class*="bg-primary"],
+html.light [class*="bg-amber-600"],
+html.light [class*="bg-emerald-600"],
+html.light [class*="bg-rose-500"] { color: #ffffff !important; }
+html.light [class*="bg-primary"] [class*="text-white"],
+html.light [class*="bg-amber-600"] [class*="text-white"],
+html.light [class*="bg-emerald-600"] [class*="text-white"],
+html.light [class*="bg-rose-500"] [class*="text-white"] { color: #ffffff !important; }
+html.light input,
+html.light select,
+html.light textarea { background-color: #ffffff !important; color: #172033 !important; border-color: #cbd5e1 !important; }
+html.light ::placeholder { color: #94a3b8 !important; }
+html.light ::-webkit-scrollbar-track { background: #eef2f7; }
+html.light ::-webkit-scrollbar-thumb { background: #b8c4d6; }
+
 /* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #0a0c16;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #2a3254;
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #7c3aed;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0a0c16; }
+::-webkit-scrollbar-thumb { background: #2a3254; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
 
 /* Thermal Receipt Print Stylesheet */
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  #thermal-receipt, #thermal-receipt * {
-    visibility: visible;
-  }
-  #thermal-receipt {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 80mm;
-    margin: 0;
-    padding: 10px;
-    background: #fff !important;
-    color: #000 !important;
-    font-family: monospace !important;
-    font-size: 12px !important;
-  }
-  .no-print {
-    display: none !important;
-  }
+  body * { visibility: hidden; }
+  #thermal-receipt, #thermal-receipt * { visibility: visible; }
+  #thermal-receipt { position: absolute; left: 0; top: 0; width: 80mm; margin: 0; padding: 10px; background: #fff !important; color: #000 !important; font-family: monospace !important; font-size: 12px !important; }
+  .no-print { display: none !important; }
 }

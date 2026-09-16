@@ -28,6 +28,7 @@ export function App() {
   const [lang, setLang] = useState<Language>(() => {
     return (localStorage.getItem('nexus_lang') as Language) || 'en';
   });
+  const [isLightMode, setIsLightMode] = useState<boolean>(() => localStorage.getItem('nexus_theme') === 'light');
 
   const t = translations[lang];
 
@@ -58,6 +59,12 @@ export function App() {
     document.documentElement.lang = lang;
     localStorage.setItem('nexus_lang', lang);
   }, [lang]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', isLightMode);
+    document.documentElement.style.colorScheme = isLightMode ? 'light' : 'dark';
+    localStorage.setItem('nexus_theme', isLightMode ? 'light' : 'dark');
+  }, [isLightMode]);
 
   const toggleLanguage = () => {
     setLang((prev) => (prev === 'en' ? 'ar' : 'en'));
@@ -256,6 +263,8 @@ export function App() {
       <Header
         lang={lang}
         onToggleLang={toggleLanguage}
+        isLightMode={isLightMode}
+        onToggleTheme={() => setIsLightMode((previous) => !previous)}
         user={user}
         shift={shift}
         metrics={metrics}

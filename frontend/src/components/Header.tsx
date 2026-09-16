@@ -12,7 +12,9 @@ import {
   CheckCircle2, 
   AlertTriangle,
   Volume2,
-  X
+  X,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { Shift, ShiftMetrics, User, NotificationItem } from '../types';
 import { Language, translations } from '../i18n/translations';
@@ -22,6 +24,8 @@ import { formatMoney } from '../utils/format';
 interface HeaderProps {
   lang: Language;
   onToggleLang: () => void;
+  isLightMode: boolean;
+  onToggleTheme: () => void;
   user: User | null;
   shift: Shift | null;
   metrics: ShiftMetrics | null;
@@ -39,6 +43,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   lang,
   onToggleLang,
+  isLightMode,
+  onToggleTheme,
   user,
   shift,
   metrics,
@@ -163,6 +169,15 @@ export const Header: React.FC<HeaderProps> = ({
             <span>{currentTime}</span>
           </div>
 
+          {/* Browser notifications */}
+          <button
+            onClick={onToggleTheme}
+            title={isLightMode ? 'Switch to dark mode' : 'التبديل للوضع الفاتح'}
+            aria-label={isLightMode ? 'Switch to dark mode' : 'Switch to light mode'}
+            className="p-2 rounded-lg bg-surface border border-border hover:border-primary text-slate-300 hover:text-white transition"
+          >
+            {isLightMode ? <Moon className="w-4 h-4 text-indigo-600" /> : <Sun className="w-4 h-4 text-amber-400" />}
+          </button>
           {/* Browser notifications */}
           <button
             onClick={onEnableNotifications}
