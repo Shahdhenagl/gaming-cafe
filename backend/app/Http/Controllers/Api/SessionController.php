@@ -224,7 +224,7 @@ class SessionController extends Controller
         $session = DeviceSession::with(['device', 'orders.items.product'])->findOrFail($id);
 
         $request->validate([
-            'payment_method' => 'required|in:cash,visa,installment,other',
+            'payment_method' => 'required|in:cash,visa,wallet,instapay,installment,other',
             'discount' => 'nullable|numeric|min:0',
             'amount_paid' => 'nullable|numeric|min:0',
         ]);

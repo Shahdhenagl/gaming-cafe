@@ -499,10 +499,12 @@ export const PosBar: React.FC<PosBarProps> = ({
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   {t.paymentMethod}
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {[
                     { id: 'cash', label: t.cash },
                     { id: 'visa', label: t.visa },
+                    { id: 'wallet', label: t.wallet },
+                    { id: 'instapay', label: t.instapay },
                   ].map((m) => (
                     <button
                       key={m.id}

@@ -112,7 +112,7 @@ export interface OrderItem {
 
 export type OrderType = 'take_away' | 'dine_in' | 'gaming_room';
 export type OrderStatus = 'pending' | 'completed' | 'cancelled';
-export type PaymentMethod = 'cash' | 'visa' | 'installment' | 'other';
+export type PaymentMethod = 'cash' | 'visa' | 'wallet' | 'instapay' | 'installment' | 'other';
 
 export interface Order {
   id: number;

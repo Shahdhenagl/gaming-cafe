@@ -57,7 +57,7 @@ class OrderController extends Controller
             'items.*.notes' => 'nullable|string',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|in:cash,visa,installment,other',
+            'payment_method' => 'nullable|in:cash,visa,wallet,instapay,installment,other',
             'payment_status' => 'nullable|in:unpaid,paid',
             'notes' => 'nullable|string',
         ]);
@@ -179,7 +179,7 @@ class OrderController extends Controller
         $order = Order::with('table')->findOrFail($id);
 
         $request->validate([
-            'payment_method' => 'required|in:cash,visa,installment,other',
+            'payment_method' => 'required|in:cash,visa,wallet,instapay,installment,other',
             'amount' => 'nullable|numeric|min:0',
         ]);
 
