@@ -146,6 +146,8 @@ export interface Table {
   current_order_id?: number | null;
   total_spent: number;
   elapsed_minutes?: number;
+  elapsed_seconds?: number;
+  occupied_at?: string | null;
   order?: {
     id: number;
     order_number: string;

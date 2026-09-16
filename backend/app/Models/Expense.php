@@ -9,7 +9,7 @@ class Expense extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['shift_id', 'staff_id', 'category', 'description', 'amount', 'expense_date', 'notes'];
+    protected $fillable = ['shift_id', 'staff_id', 'category', 'description', 'amount', 'payment_method', 'expense_date', 'notes'];
 
     protected $casts = ['amount' => 'float', 'expense_date' => 'date'];
 

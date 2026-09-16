@@ -23,9 +23,11 @@ class TableController extends Controller
 
         $formatted = $tables->map(function ($t) {
             $order = $t->currentOrder;
-            $elapsedMinutes = 0;
+            $elapsedSeconds = 0;
             if ($order) {
-                $elapsedMinutes = Carbon::parse($order->created_at)->diffInMinutes(Carbon::now());
+                $elapsedSeconds = Carbon::parse($t->occupied_at ?: $order->created_at)->diffInSeconds(Carbon::now());
+            } elseif ($t->occupied_at) {
+                $elapsedSeconds = Carbon::parse($t->occupied_at)->diffInSeconds(Carbon::now());
             }
 
             return [
@@ -35,7 +37,9 @@ class TableController extends Controller
                 'status' => $t->status,
                 'current_order_id' => $t->current_order_id,
                 'total_spent' => (float)$t->total_spent,
-                'elapsed_minutes' => $elapsedMinutes,
+                'occupied_at' => $t->occupied_at?->toISOString(),
+                'elapsed_seconds' => max(0, $elapsedSeconds),
+                'elapsed_minutes' => (int)floor(max(0, $elapsedSeconds) / 60),
                 'order' => $order ? [
                     'id' => $order->id,
                     'order_number' => $order->order_number,
@@ -83,7 +87,7 @@ class TableController extends Controller
     public function occupy(Request $request, $id)
     {
         $table = Table::findOrFail($id);
-        $table->update(['status' => 'occupied']);
+        $table->update(['status' => 'occupied', 'occupied_at' => Carbon::now()]);
 
         return response()->json([
             'message' => 'Table marked as occupied',
@@ -139,6 +143,7 @@ class TableController extends Controller
             // Release table!
             $table->update([
                 'status' => 'available',
+                'occupied_at' => null,
                 'current_order_id' => null,
                 'total_spent' => 0.00,
             ]);
@@ -177,6 +182,7 @@ class TableController extends Controller
 
             $table->update([
                 'status' => 'available',
+                'occupied_at' => null,
                 'current_order_id' => null,
                 'total_spent' => 0.00,
             ]);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DeviceSession;
+use App\Models\Expense;
 use App\Models\Order;
 use App\Models\Shift;
 use App\Models\ShiftReport;
@@ -42,13 +43,16 @@ class ShiftController extends Controller
         // Aggregate shift metrics dynamically
         $orders = Order::where('shift_id', $shift->id)->where('status', '!=', 'cancelled')->get();
         $sessions = DeviceSession::where('shift_id', $shift->id)->get();
+        $expenses = Expense::where('shift_id', $shift->id)->get();
 
         $totalOrderRevenue = $orders->sum('total_amount');
         $totalSessionRevenue = $sessions->sum('session_cost');
         $totalRevenue = $totalOrderRevenue + $totalSessionRevenue;
 
-        $cashTotal = $orders->where('payment_method', 'cash')->sum('total_amount')
+        $cashRevenue = $orders->where('payment_method', 'cash')->sum('total_amount')
             + $sessions->where('payment_method', 'cash')->sum('session_cost');
+        $cashExpenses = $expenses->where('payment_method', 'cash')->sum('amount');
+        $cashTotal = max(0, $cashRevenue - $cashExpenses);
 
         $cardTotal = $orders->where('payment_method', 'visa')->sum('total_amount')
             + $sessions->where('payment_method', 'visa')->sum('session_cost');
@@ -76,6 +80,9 @@ class ShiftController extends Controller
                 'total_beverages_sold' => $totalBeveragesCount,
                 'total_revenue' => round($totalRevenue, 2),
                 'cash_collected' => round($cashTotal, 2),
+                'cash_revenue' => round($cashRevenue, 2),
+                'cash_expenses' => round($cashExpenses, 2),
+                'expenses_total' => round($expenses->sum('amount'), 2),
                 'card_collected' => round($cardTotal, 2),
                 'average_order_value' => $orders->count() > 0 ? round($totalOrderRevenue / $orders->count(), 2) : 0.00,
             ]
@@ -131,10 +138,13 @@ class ShiftController extends Controller
 
         $orders = Order::where('shift_id', $shift->id)->where('status', '!=', 'cancelled')->get();
         $sessions = DeviceSession::where('shift_id', $shift->id)->get();
+        $expenses = Expense::where('shift_id', $shift->id)->get();
 
         $totalRevenue = $orders->sum('total_amount') + $sessions->sum('session_cost');
-        $cashTotal = $orders->where('payment_method', 'cash')->sum('total_amount')
+        $cashRevenue = $orders->where('payment_method', 'cash')->sum('total_amount')
             + $sessions->where('payment_method', 'cash')->sum('session_cost');
+        $cashExpenses = $expenses->where('payment_method', 'cash')->sum('amount');
+        $cashTotal = max(0, $cashRevenue - $cashExpenses);
         $cardTotal = $orders->where('payment_method', 'visa')->sum('total_amount')
             + $sessions->where('payment_method', 'visa')->sum('session_cost');
 

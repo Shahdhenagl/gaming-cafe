@@ -22,6 +22,7 @@ class ExpenseController extends Controller
             'category' => 'required|string|max:100',
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0',
+            'payment_method' => 'required|in:cash,visa,wallet,instapay,bank_transfer,other',
             'expense_date' => 'required|date',
             'notes' => 'nullable|string',
         ]);

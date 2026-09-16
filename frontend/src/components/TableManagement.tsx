@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Users, 
   Clock, 
@@ -40,6 +40,22 @@ export const TableManagement: React.FC<TableManagementProps> = ({
   const [moveModalTable, setMoveModalTable] = useState<Table | null>(null);
   const [targetSessionId, setTargetSessionId] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    const sync = () => setElapsedSeconds(Object.fromEntries(tables.filter(t => t.status === 'occupied').map(t => [t.id, t.elapsed_seconds ?? (t.elapsed_minutes ?? 0) * 60])));
+    sync();
+    const timer = window.setInterval(() => setElapsedSeconds(prev => Object.fromEntries(Object.entries(prev).map(([id, seconds]) => [id, seconds + 1]))), 1000);
+    return () => window.clearInterval(timer);
+  }, [tables]);
+
+  const formatElapsed = (seconds: number) => {
+    const safe = Math.max(0, Math.floor(seconds));
+    const h = Math.floor(safe / 3600).toString().padStart(2, '0');
+    const m = Math.floor((safe % 3600) / 60).toString().padStart(2, '0');
+    const s = (safe % 60).toString().padStart(2, '0');
+    return `${h}:${m}:${s}`;
+  };
 
   // Active gaming stations
   const activeStations = devices.filter((d) => d.active_session);
@@ -135,10 +151,10 @@ export const TableManagement: React.FC<TableManagementProps> = ({
                   <span className="text-2xl lg:text-3xl font-black text-white group-hover:text-amber-300 transition font-mono">
                     {table.table_number}
                   </span>
-                  {isOccupied && table.elapsed_minutes !== undefined && (
+                  {isOccupied && (
                     <div className="flex items-center justify-center gap-1 text-[11px] text-slate-400 mt-1">
                       <Clock className="w-3 h-3 text-amber-400" />
-                      <span>{table.elapsed_minutes} mins ago</span>
+                      <span className="font-mono text-amber-300">{formatElapsed(elapsedSeconds[table.id] ?? 0)}</span>
                     </div>
                   )}
                 </div>

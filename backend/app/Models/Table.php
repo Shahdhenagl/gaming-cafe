@@ -13,12 +13,14 @@ class Table extends Model
         'table_number',
         'capacity',
         'status',
+        'occupied_at',
         'current_order_id',
         'total_spent',
     ];
 
     protected $casts = [
         'capacity' => 'integer',
+        'occupied_at' => 'datetime',
         'total_spent' => 'float',
     ];
 

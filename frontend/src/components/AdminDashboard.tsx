@@ -26,7 +26,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [expenses, setExpenses] = useState<any[]>([]);
-  const [expenseDraft, setExpenseDraft] = useState({ category: 'general', description: '', amount: '', expense_date: new Date().toISOString().slice(0, 10) });
+  const [expenseDraft, setExpenseDraft] = useState({ category: 'general', description: '', amount: '', payment_method: 'cash', expense_date: new Date().toISOString().slice(0, 10) });
 
   useEffect(() => {
     fetchDashboard();
@@ -163,6 +163,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
           <h3 className="font-bold text-white">Add expense / إضافة مصروف</h3>
           <input className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-sm" placeholder="Description / البيان" value={expenseDraft.description} onChange={e => setExpenseDraft({ ...expenseDraft, description: e.target.value })} />
           <div className="grid grid-cols-2 gap-3"><input className="rounded-xl bg-surface border border-border px-3 py-2 text-sm" placeholder="Category" value={expenseDraft.category} onChange={e => setExpenseDraft({ ...expenseDraft, category: e.target.value })} /><input className="rounded-xl bg-surface border border-border px-3 py-2 text-sm" type="number" min="0" placeholder="Amount" value={expenseDraft.amount} onChange={e => setExpenseDraft({ ...expenseDraft, amount: e.target.value })} /></div>
+          <select className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-sm" value={expenseDraft.payment_method} onChange={e => setExpenseDraft({ ...expenseDraft, payment_method: e.target.value })}><option value="cash">Cash drawer</option><option value="visa">Visa</option><option value="wallet">Wallet</option><option value="instapay">InstaPay</option><option value="bank_transfer">Bank transfer</option><option value="other">Other</option></select>
           <input className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-sm" type="date" value={expenseDraft.expense_date} onChange={e => setExpenseDraft({ ...expenseDraft, expense_date: e.target.value })} />
           <button className="w-full rounded-xl bg-rose-600 hover:bg-rose-500 py-2 text-sm font-bold">Save expense</button>
         </form>
