@@ -42,6 +42,7 @@ $apiRoutes = function () {
 
     // 1. Authentication
     Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/user', [AuthController::class, 'user']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 
@@ -100,6 +101,7 @@ $apiRoutes = function () {
     // 8. Reports & Analytics
     Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
     Route::get('/reports/analytics', [ReportController::class, 'analytics']);
+    });
 };
 
 // Direct routes (/api/...)

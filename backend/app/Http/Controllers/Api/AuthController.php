@@ -74,8 +74,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
         if (!$user) {
-            // Fallback for demo when unauthenticated
-            $user = User::first();
+            return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
         $user->load('currentShift');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Gamepad2, 
   Coffee, 
@@ -44,6 +44,7 @@ export function App() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [loadingInitial, setLoadingInitial] = useState<boolean>(true);
+  const notifiedIds = useRef<Set<number>>(new Set());
 
   // Modals
   const [showStartShiftModal, setShowStartShiftModal] = useState<boolean>(false);
@@ -83,8 +84,15 @@ export function App() {
       if (prodRes && prodRes.products) setProducts(prodRes.products);
       if (tableRes && tableRes.tables) setTables(tableRes.tables);
       if (notifRes) {
-        setNotifications(notifRes.notifications || []);
+        const nextNotifications = notifRes.notifications || [];
+        setNotifications(nextNotifications);
         setUnreadCount(notifRes.unread_count || 0);
+        nextNotifications.filter((n) => !n.is_read && !notifiedIds.current.has(n.id)).forEach((n) => {
+          notifiedIds.current.add(n.id);
+          if ('Notification' in window && Notification.permission === 'granted') {
+            navigator.serviceWorker?.ready.then((registration) => registration.showNotification(n.title, { body: n.message, icon: '/controller-icon.svg', tag: `notification-${n.id}` })).catch(() => undefined);
+          }
+        });
       }
     } catch (e) {
       console.error('Error loading initial data:', e);
@@ -109,8 +117,15 @@ export function App() {
         if (devRes && devRes.devices) setDevices(devRes.devices);
         if (tableRes && tableRes.tables) setTables(tableRes.tables);
         if (notifRes) {
-          setNotifications(notifRes.notifications || []);
+          const nextNotifications = notifRes.notifications || [];
+          setNotifications(nextNotifications);
           setUnreadCount(notifRes.unread_count || 0);
+          nextNotifications.filter((n) => !n.is_read && !notifiedIds.current.has(n.id)).forEach((n) => {
+            notifiedIds.current.add(n.id);
+            if ('Notification' in window && Notification.permission === 'granted') {
+              navigator.serviceWorker?.ready.then((registration) => registration.showNotification(n.title, { body: n.message, icon: '/controller-icon.svg', tag: `notification-${n.id}` })).catch(() => undefined);
+            }
+          });
         }
         if (shiftRes) {
           setShift(shiftRes.shift);
@@ -252,12 +267,15 @@ export function App() {
         onOpenEndShift={() => setShowEndShiftModal(true)}
         onOpenLogin={() => setShowLoginModal(true)}
         onLogout={handleLogout}
+        onEnableNotifications={async () => {
+          if ('Notification' in window) await Notification.requestPermission();
+        }}
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Navigation Bar */}
-        <div className="flex items-center gap-1.5 bg-surface/80 border border-border p-1.5 rounded-2xl overflow-x-auto shadow-sm">
+        <div className="flex items-center gap-1.5 bg-surface/80 border border-border p-1.5 rounded-2xl overflow-x-auto shadow-sm snap-x">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -265,7 +283,7 @@ export function App() {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as any)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs lg:text-sm transition-all whitespace-nowrap ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl font-bold text-xs lg:text-sm transition-all whitespace-nowrap snap-start ${
                   isActive
                     ? 'bg-primary text-white shadow-neon-purple scale-[1.02]'
                     : 'text-slate-400 hover:text-white hover:bg-card'

@@ -33,6 +33,7 @@ interface HeaderProps {
   onOpenEndShift: () => void;
   onOpenLogin: () => void;
   onLogout: () => void;
+  onEnableNotifications: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -49,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenEndShift,
   onOpenLogin,
   onLogout,
+  onEnableNotifications,
 }) => {
   const t = translations[lang];
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -73,11 +75,11 @@ export const Header: React.FC<HeaderProps> = ({
   }, [lang]);
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0c1022]/95 backdrop-blur-md border-b border-border/80 px-4 lg:px-8 py-3 transition-colors">
-      <div className="flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 bg-[#0c1022]/95 backdrop-blur-md border-b border-border/80 px-3 sm:px-4 lg:px-8 py-2.5 sm:py-3 transition-colors">
+      <div className="flex items-center justify-between gap-2 sm:gap-4 min-w-0">
         {/* Brand & Logo */}
         <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-900 via-purple-950 to-slate-950 border border-purple-500/40 shadow-neon-purple overflow-hidden shrink-0 group">
+          <div className="relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-slate-900 via-purple-950 to-slate-950 border border-purple-500/40 shadow-neon-purple overflow-hidden shrink-0 group">
             <img
               src="/al5al-banner.png"
               alt="AL5AL Lounge"
@@ -87,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-1.5 font-display">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-1.5 font-display">
                 <span className="tracking-wider text-white">
                   AL<span className="text-amber-400 font-extrabold drop-shadow-[0_0_12px_rgba(245,158,11,0.6)]">5</span>AL
                 </span>
@@ -161,6 +163,14 @@ export const Header: React.FC<HeaderProps> = ({
             <span>{currentTime}</span>
           </div>
 
+          {/* Browser notifications */}
+          <button
+            onClick={onEnableNotifications}
+            title={lang === 'ar' ? 'تفعيل إشعارات انتهاء الجلسات' : 'Enable session-end notifications'}
+            className="p-2 rounded-lg bg-surface border border-border hover:border-primary text-slate-300 hover:text-white transition"
+          >
+            <Bell className="w-4 h-4 text-cyan-400" />
+          </button>
           {/* Audio Test Chime */}
           <button
             onClick={() => sounds.playWarning10Min()}
