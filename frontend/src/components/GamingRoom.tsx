@@ -94,7 +94,9 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
     const initialCounts: { [deviceId: number]: number } = {};
     devices.forEach((d) => {
       if (d.active_session) {
-        initialCounts[d.id] = Math.max(0, Math.floor(safeNum(d.active_session.remaining_seconds)));
+        initialCounts[d.id] = d.active_session.is_open_ended
+          ? Math.max(0, Math.floor((Date.now() - new Date(d.active_session.start_time).getTime()) / 1000))
+          : Math.max(0, Math.floor(safeNum(d.active_session.remaining_seconds)));
       }
     });
     setCountdowns(initialCounts);
@@ -105,7 +107,9 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
 
         devices.forEach((d) => {
           if (d.active_session) {
-            const current = next[d.id] !== undefined ? next[d.id] : Math.max(0, Math.floor(safeNum(d.active_session.remaining_seconds)));
+            const current = next[d.id] !== undefined ? next[d.id] : d.active_session.is_open_ended
+              ? Math.max(0, Math.floor((Date.now() - new Date(d.active_session.start_time).getTime()) / 1000))
+              : Math.max(0, Math.floor(safeNum(d.active_session.remaining_seconds)));
             if (d.active_session.is_open_ended) {
               next[d.id] = current + 1;
             } else if (current > 0) {
@@ -279,6 +283,10 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
           const remainingSec = countdowns[device.id] ?? (session?.remaining_seconds || 0);
           const isEndingSoon = !session?.is_open_ended && remainingSec > 0 && remainingSec <= 600;
           const isEnded = session && !session.is_open_ended && remainingSec <= 0;
+          const liveSessionCost = session?.is_open_ended
+            ? Math.round((remainingSec / 3600) * safeNum(device.hourly_rate) * 100) / 100
+            : safeNum(session?.session_cost);
+          const liveTotal = Math.max(0, liveSessionCost + safeNum(session?.beverage_cost) - safeNum(session?.discount));
 
           // Status colors
           let statusBorder = 'border-border/80';
@@ -386,7 +394,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                       </div>
                       <div className="flex justify-between text-slate-300">
                         <span className="text-slate-400">{t.sessionCost}:</span>
-                        <span className="font-mono" dir="ltr">{formatMoney(session.session_cost)} {t.currency}</span>
+                        <span className="font-mono" dir="ltr">{formatMoney(liveSessionCost)} {t.currency}</span>
                       </div>
                       {safeNum(session.beverage_cost) > 0 && (
                         <div className="flex justify-between text-slate-300">
@@ -396,7 +404,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                       )}
                       <div className="flex justify-between text-white font-bold pt-1 border-t border-border/60">
                         <span>{t.totalDue}:</span>
-                        <span className="font-mono text-emerald-400 text-sm" dir="ltr">{formatMoney(session.total_amount)} {t.currency}</span>
+                        <span className="font-mono text-emerald-400 text-sm" dir="ltr">{formatMoney(session.is_open_ended ? liveTotal : session.total_amount)} {t.currency}</span>
                       </div>
                     </div>
                   </div>
