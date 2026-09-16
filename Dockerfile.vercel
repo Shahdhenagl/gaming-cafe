@@ -17,6 +17,7 @@ COPY backend/composer.json backend/composer.lock ./
 RUN composer install --no-dev --no-interaction --no-progress --no-scripts --optimize-autoloader --prefer-dist
 COPY backend/ ./
 COPY --from=frontend-build /app/frontend/dist/ ./public/
+RUN test -f ./public/index.html && test -f ./public/assets/index-*.js
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache \
     && composer dump-autoload --no-dev --classmap-authoritative
 
