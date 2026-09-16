@@ -31,7 +31,7 @@ export const ManagementDashboard: React.FC<Props> = ({ lang, products: initialPr
 
   const save = <T,>(key: string, value: T) => localStorage.setItem(key, JSON.stringify(value));
   const flash = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 2200); };
-  const canManage = user?.role === 'admin' || user?.role === 'manager' || !user;
+  const canManage = user?.role === 'admin' || user?.role === 'manager';
   const title = useMemo(() => section === 'products' ? (ar ? 'المنتجات والمشروبات' : 'Products & Beverages') : section === 'devices' ? (ar ? 'الألعاب والطاولات' : 'Games & Tables') : (ar ? 'المستخدمون والصلاحيات' : 'Users & Permissions'), [section, ar]);
 
   if (!canManage) return <div className="p-10 text-center bg-card rounded-2xl border border-border"><UserRound className="mx-auto w-10 h-10 text-rose-400 mb-3" /><p className="font-bold">{ar ? 'ليس لديك صلاحية إدارة البيانات' : 'You do not have management permissions'}</p></div>;
@@ -40,15 +40,19 @@ export const ManagementDashboard: React.FC<Props> = ({ lang, products: initialPr
   const editProduct = (p: Product) => { setEditingId(p.id); setProductDraft({ name: p.name, name_ar: p.name_ar, category: p.category, price: String(p.price), cost_price: String(p.cost_price ?? 0), stock_quantity: String(p.stock_quantity), reorder_level: String(p.reorder_level) }); };
   const submitProduct = async (event: React.FormEvent) => { event.preventDefault(); if (!productDraft.name || !productDraft.name_ar || productDraft.price === '') return;
     const payload = { ...productDraft, price: Number(productDraft.price), cost_price: Number(productDraft.cost_price || 0), stock_quantity: Number(productDraft.stock_quantity), reorder_level: Number(productDraft.reorder_level) };
-    const response = editingId ? await api.updateProduct(editingId, payload) : await api.createProduct(payload);
-    setProducts(prev => editingId ? prev.map(p => p.id === editingId ? response.product : p) : [...prev, response.product]); await onRefresh?.(); reset(); flash(ar ? 'تم حفظ المنتج في قاعدة البيانات' : 'Product saved to database');
+    try {
+      const response = editingId ? await api.updateProduct(editingId, payload) : await api.createProduct(payload);
+      setProducts(prev => editingId ? prev.map(p => p.id === editingId ? response.product : p) : [...prev, response.product]); await onRefresh?.(); reset(); flash(ar ? 'تم حفظ المنتج في قاعدة البيانات' : 'Product saved to database');
+    } catch (error) { flash(error instanceof Error ? error.message : (ar ? 'فشل حفظ المنتج' : 'Could not save product')); }
   };
   const removeProduct = async (id: number) => { if (!confirm(ar ? 'حذف المنتج؟' : 'Delete this product?')) return; await api.deleteProduct(id); setProducts(prev => prev.filter(p => p.id !== id)); };
   const editDevice = (d: Device) => { setEditingId(d.id); setDeviceDraft({ room_name: d.room_name, room_name_ar: d.room_name_ar || '', device_name: d.device_name, device_name_ar: d.device_name_ar || '', device_type: d.device_type, hourly_rate: String(d.hourly_rate), specs: d.specs || '' }); };
   const submitDevice = async (event: React.FormEvent) => { event.preventDefault(); if (!deviceDraft.room_name || !deviceDraft.device_name || deviceDraft.hourly_rate === '') return;
     const payload = { ...deviceDraft, hourly_rate: Number(deviceDraft.hourly_rate) };
-    const response = editingId ? await api.updateDevice(editingId, payload) : await api.createDevice(payload);
-    setDevices(prev => editingId ? prev.map(d => d.id === editingId ? response.device : d) : [...prev, response.device]); await onRefresh?.(); reset(); flash(ar ? 'تم حفظ اللعبة/الطاولة في قاعدة البيانات' : 'Game/table saved to database');
+    try {
+      const response = editingId ? await api.updateDevice(editingId, payload) : await api.createDevice(payload);
+      setDevices(prev => editingId ? prev.map(d => d.id === editingId ? response.device : d) : [...prev, response.device]); await onRefresh?.(); reset(); flash(ar ? 'تم حفظ اللعبة/الطاولة في قاعدة البيانات' : 'Game/table saved to database');
+    } catch (error) { flash(error instanceof Error ? error.message : (ar ? 'فشل حفظ اللعبة' : 'Could not save game/table')); }
   };
   const removeDevice = async (id: number) => { if (!confirm(ar ? 'حذف اللعبة/الطاولة؟' : 'Delete this game/table?')) return; await api.deleteDevice(id); setDevices(prev => prev.filter(d => d.id !== id)); };
   const submitUser = async (event: React.FormEvent) => { event.preventDefault(); if (!userDraft.name || !userDraft.email || (!editingId && !userDraft.password && !userDraft.pin_code)) return;
