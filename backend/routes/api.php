@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SessionController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\TableController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 $apiRoutes = function () {
@@ -56,7 +57,10 @@ $apiRoutes = function () {
         Route::post('/products', [ProductController::class, 'store']);
         Route::patch('/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
-        Route::patch('/products/{id}/stock', [ProductController::class, 'updateStock']);
+        Route::post('/products', [ProductController::class, 'store']);
+    Route::patch('/products/{id}', [ProductController::class, 'update']);
+    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    Route::patch('/products/{id}/stock', [ProductController::class, 'updateStock']);
         Route::get('/inventory/report', [ProductController::class, 'inventoryReport']);
         Route::get('/expenses', [ExpenseController::class, 'index']);
         Route::post('/expenses', [ExpenseController::class, 'store']);

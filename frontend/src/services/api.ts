@@ -366,6 +366,11 @@ class ApiService {
 
   async createProduct(data: Partial<Product>) { return this.request<{ product: Product }>('/products', { method: 'POST', body: JSON.stringify(data) }); }
   async updateProduct(id: number, data: Partial<Product>) { return this.request<{ product: Product }>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  async deleteProduct(id: number) { return this.request(`/products/${id}`, { method: 'DELETE' }); }
+  async getUsers(): Promise<{ users: User[] }> { return this.request<{ users: User[] }>('/users'); }
+  async createUser(data: Partial<User> & { password?: string }) { return this.request<{ user: User }>('/users', { method: 'POST', body: JSON.stringify(data) }); }
+  async updateUser(id: number, data: Partial<User> & { password?: string }) { return this.request<{ user: User }>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  async deleteUser(id: number) { return this.request(`/users/${id}`, { method: 'DELETE' }); }
 
   async updateStock(productId: number, data: { quantity_change: number; reason: 'restock' | 'adjustment' | 'sale' }) {
     if (isStandalone) return mockStore.updateStock(productId, data);

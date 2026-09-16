@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Edit3, Gamepad2, Package, Save, Trash2, UserRound } from 'lucide-react';
 import { Device, Product, User } from '../types';
 import { Language } from '../i18n/translations';
@@ -27,6 +27,8 @@ export const ManagementDashboard: React.FC<Props> = ({ lang, products: initialPr
   const [editingId, setEditingId] = useState<number | null>(null);
   const [notice, setNotice] = useState('');
 
+  useEffect(() => { api.getUsers().then(({ users: remoteUsers }) => setUsers(remoteUsers)).catch(() => undefined); }, []);
+
   const save = <T,>(key: string, value: T) => localStorage.setItem(key, JSON.stringify(value));
   const flash = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 2200); };
   const canManage = user?.role === 'admin' || user?.role === 'manager' || !user;
@@ -41,7 +43,7 @@ export const ManagementDashboard: React.FC<Props> = ({ lang, products: initialPr
     const response = editingId ? await api.updateProduct(editingId, payload) : await api.createProduct(payload);
     setProducts(prev => editingId ? prev.map(p => p.id === editingId ? response.product : p) : [...prev, response.product]); await onRefresh?.(); reset(); flash(ar ? 'تم حفظ المنتج في قاعدة البيانات' : 'Product saved to database');
   };
-  const removeProduct = (id: number) => { if (!confirm(ar ? 'حذف المنتج؟' : 'Delete this product?')) return; setProducts(prev => prev.filter(p => p.id !== id)); };
+  const removeProduct = async (id: number) => { if (!confirm(ar ? 'حذف المنتج؟' : 'Delete this product?')) return; await api.deleteProduct(id); setProducts(prev => prev.filter(p => p.id !== id)); };
   const editDevice = (d: Device) => { setEditingId(d.id); setDeviceDraft({ room_name: d.room_name, room_name_ar: d.room_name_ar || '', device_name: d.device_name, device_name_ar: d.device_name_ar || '', device_type: d.device_type, hourly_rate: String(d.hourly_rate), specs: d.specs || '' }); };
   const submitDevice = async (event: React.FormEvent) => { event.preventDefault(); if (!deviceDraft.room_name || !deviceDraft.device_name || deviceDraft.hourly_rate === '') return;
     const payload = { ...deviceDraft, hourly_rate: Number(deviceDraft.hourly_rate) };
@@ -49,11 +51,12 @@ export const ManagementDashboard: React.FC<Props> = ({ lang, products: initialPr
     setDevices(prev => editingId ? prev.map(d => d.id === editingId ? response.device : d) : [...prev, response.device]); await onRefresh?.(); reset(); flash(ar ? 'تم حفظ اللعبة/الطاولة في قاعدة البيانات' : 'Game/table saved to database');
   };
   const removeDevice = async (id: number) => { if (!confirm(ar ? 'حذف اللعبة/الطاولة؟' : 'Delete this game/table?')) return; await api.deleteDevice(id); setDevices(prev => prev.filter(d => d.id !== id)); };
-  const submitUser = (event: React.FormEvent) => { event.preventDefault(); if (!userDraft.name || !userDraft.email || (!editingId && !userDraft.password)) return;
+  const submitUser = async (event: React.FormEvent) => { event.preventDefault(); if (!userDraft.name || !userDraft.email || (!editingId && !userDraft.password && !userDraft.pin_code)) return;
     const item: User = { id: editingId || Date.now(), name: userDraft.name, email: userDraft.email, phone: userDraft.phone, pin_code: userDraft.pin_code, role: userDraft.role };
-    const next = editingId ? users.map(u => u.id === editingId ? { ...u, ...item } : u) : [...users, item]; setUsers(next); save('al5al_admin_users', next); reset(); flash(ar ? 'تم حفظ المستخدم' : 'User saved');
+    const response = editingId ? await api.updateUser(editingId, { ...item, password: userDraft.password || undefined }) : await api.createUser({ ...item, password: userDraft.password || userDraft.pin_code });
+    const next = editingId ? users.map(u => u.id === editingId ? response.user : u) : [...users, response.user]; setUsers(next); save('al5al_admin_users', next); reset(); flash(ar ? 'تم حفظ المستخدم في قاعدة البيانات' : 'User saved to database');
   };
-  const removeUser = (id: number) => { if (!confirm(ar ? 'حذف المستخدم؟' : 'Delete this user?')) return; const next = users.filter(u => u.id !== id); setUsers(next); save('al5al_admin_users', next); };
+  const removeUser = async (id: number) => { if (!confirm(ar ? 'حذف المستخدم؟' : 'Delete this user?')) return; await api.deleteUser(id); const next = users.filter(u => u.id !== id); setUsers(next); save('al5al_admin_users', next); };
   const input = 'w-full rounded-xl bg-surface border border-border px-3 py-2.5 text-sm outline-none focus:border-primary';
   const tabs = [{ id: 'products' as Section, label: ar ? 'منتجات ومشروبات' : 'Products', icon: Package }, { id: 'devices' as Section, label: ar ? 'ألعاب وطاولات' : 'Games & Tables', icon: Gamepad2 }, { id: 'users' as Section, label: ar ? 'مستخدمين' : 'Users', icon: UserRound }];
 
