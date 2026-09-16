@@ -26,18 +26,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<'day' | 'week' | 'month'>('week');
   const [expenseDraft, setExpenseDraft] = useState({ category: 'general', description: '', amount: '', payment_method: 'cash', expense_date: new Date().toISOString().slice(0, 10) });
 
-  useEffect(() => {
-    fetchDashboard();
-  }, []);
+  useEffect(() => { fetchDashboard(); }, [analyticsPeriod]);
 
   const fetchDashboard = async () => {
     setLoading(true);
     try {
       const [dash, anal, expenseRes] = await Promise.all([
         api.getDashboardReport(),
-        api.getAnalytics(7),
+        api.getAnalytics(analyticsPeriod),
         api.getExpenses(30).catch(() => ({ expenses: [] })),
       ]);
       setDashboardData(dash);
@@ -177,9 +176,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
           <div className="flex items-center justify-between pb-3 border-b border-border">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-emerald-400" />
-              <h3 className="font-bold text-base text-white">
-                {t.peakHours} (Past 7 Days)
-              </h3>
+              <div><h3 className="font-bold text-base text-white">{t.peakHours} ({analyticsPeriod === 'day' ? 'Today / اليوم' : analyticsPeriod === 'month' ? 'This month / هذا الشهر' : 'Past 7 days / آخر 7 أيام'})</h3><p className="text-[10px] text-slate-500 mt-1">Revenue, expenses, cost and net profit</p></div>
+              <div className="flex gap-1"><button onClick={() => setAnalyticsPeriod('day')} className={`px-2 py-1 rounded-lg text-[10px] ${analyticsPeriod === 'day' ? 'bg-primary text-white' : 'bg-surface text-slate-400'}`}>يوم</button><button onClick={() => setAnalyticsPeriod('week')} className={`px-2 py-1 rounded-lg text-[10px] ${analyticsPeriod === 'week' ? 'bg-primary text-white' : 'bg-surface text-slate-400'}`}>أسبوع</button><button onClick={() => setAnalyticsPeriod('month')} className={`px-2 py-1 rounded-lg text-[10px] ${analyticsPeriod === 'month' ? 'bg-primary text-white' : 'bg-surface text-slate-400'}`}>شهر</button></div>
             </div>
             <div className="flex items-center gap-3 text-xs">
               <span className="flex items-center gap-1 text-slate-400">

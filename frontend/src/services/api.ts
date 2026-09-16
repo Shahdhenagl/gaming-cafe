@@ -446,7 +446,7 @@ class ApiService {
     }
   }
 
-  async getAnalytics(days: number = 7): Promise<{
+  async getAnalytics(period: 'day' | 'week' | 'month' = 'week'): Promise<{
     daily_stats: {
       date: string;
       day: string;
@@ -458,9 +458,10 @@ class ApiService {
     }[];
       category_breakdown: any[];
   }> {
+    const days = period === 'day' ? 1 : period === 'month' ? 30 : 7;
     if (isStandalone) return mockStore.getAnalytics(days);
     try {
-      return await this.request(`/reports/analytics?days=${days}`);
+      return await this.request(`/reports/analytics?period=${period}`);
     } catch {
       return mockStore.getAnalytics(days);
     }

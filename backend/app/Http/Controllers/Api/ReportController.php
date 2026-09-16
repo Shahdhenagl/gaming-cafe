@@ -100,8 +100,17 @@ class ReportController extends Controller
      */
     public function analytics(Request $request)
     {
-        $days = (int)$request->input('days', 7);
-        $fromDate = Carbon::now()->subDays($days);
+        $period = $request->input('period', 'week');
+        if ($period === 'day') {
+            $days = 1;
+            $fromDate = Carbon::today();
+        } elseif ($period === 'month') {
+            $fromDate = Carbon::now()->startOfMonth();
+            $days = $fromDate->daysInMonth;
+        } else {
+            $days = max(1, min((int)$request->input('days', 7), 31));
+            $fromDate = Carbon::now()->subDays($days - 1)->startOfDay();
+        }
 
         // Daily revenue trend
         $orders = Order::where('created_at', '>=', $fromDate)
@@ -112,9 +121,10 @@ class ReportController extends Controller
         $expenses = Expense::where('expense_date', '>=', $fromDate->toDateString())->get();
 
         $dailyStats = [];
-        for ($i = $days - 1; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i)->format('Y-m-d');
-            $dayName = Carbon::now()->subDays($i)->format('D');
+        for ($i = 0; $i < $days; $i++) {
+            $periodDate = (clone $fromDate)->addDays($i);
+            $date = $periodDate->format('Y-m-d');
+            $dayName = $periodDate->format('D');
 
             $dayOrders = $orders->filter(fn($o) => $o->created_at->format('Y-m-d') === $date);
             $daySessions = $sessions->filter(fn($s) => $s->created_at->format('Y-m-d') === $date);
