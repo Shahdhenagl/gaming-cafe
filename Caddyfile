@@ -2,15 +2,14 @@
     root * /app/public
     encode zstd gzip
 
-    route {
-        @api path /api /api/*
-        handle @api {
-            php_server
-        }
+    # Send Laravel API requests to PHP.
+    handle /api* {
+        php_server
+    }
 
-        handle {
-            try_files {path} /index.html
-            file_server
-        }
+    # Serve React assets and fall back to the SPA entry point.
+    handle {
+        try_files {path} /index.html
+        file_server
     }
 }
