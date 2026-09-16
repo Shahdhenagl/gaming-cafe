@@ -166,15 +166,19 @@ class ApiService {
     }
   }
 
-  async startSession(deviceId: number, data: { duration_minutes: number; customer_name?: string; customer_phone?: string; discount?: number }) {
-    if (isStandalone) return mockStore.startSession(deviceId, data);
+  async createDevice(data: Partial<Device>) { return this.request<{ device: Device }>('/devices', { method: 'POST', body: JSON.stringify(data) }); }
+  async updateDevice(id: number, data: Partial<Device>) { return this.request<{ device: Device }>(`/devices/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  async deleteDevice(id: number) { return this.request(`/devices/${id}`, { method: 'DELETE' }); }
+
+  async startSession(deviceId: number, data: { duration_minutes?: number; is_open_ended?: boolean; customer_name?: string; customer_phone?: string; discount?: number }) {
+    if (isStandalone) return mockStore.startSession(deviceId, { ...data, duration_minutes: data.duration_minutes || 60 });
     try {
       return await this.request(`/devices/${deviceId}/session/start`, {
         method: 'POST',
         body: JSON.stringify(data),
       });
     } catch {
-      return mockStore.startSession(deviceId, data);
+      return mockStore.startSession(deviceId, { ...data, duration_minutes: data.duration_minutes || 60 });
     }
   }
 
@@ -360,6 +364,9 @@ class ApiService {
     }
   }
 
+  async createProduct(data: Partial<Product>) { return this.request<{ product: Product }>('/products', { method: 'POST', body: JSON.stringify(data) }); }
+  async updateProduct(id: number, data: Partial<Product>) { return this.request<{ product: Product }>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
+
   async updateStock(productId: number, data: { quantity_change: number; reason: 'restock' | 'adjustment' | 'sale' }) {
     if (isStandalone) return mockStore.updateStock(productId, data);
     try {
@@ -449,7 +456,7 @@ class ApiService {
       orders_count: number;
       sessions_count: number;
     }[];
-    category_breakdown: any[];
+      category_breakdown: any[];
   }> {
     if (isStandalone) return mockStore.getAnalytics(days);
     try {
@@ -458,6 +465,10 @@ class ApiService {
       return mockStore.getAnalytics(days);
     }
   }
+
+  async getExpenses(days = 30) { return this.request<{ expenses: any[]; total: number }>(`/expenses?days=${days}`); }
+  async createExpense(data: { category: string; description: string; amount: number; expense_date: string; notes?: string }) { return this.request('/expenses', { method: 'POST', body: JSON.stringify(data) }); }
+  async deleteExpense(id: number) { return this.request(`/expenses/${id}`, { method: 'DELETE' }); }
 }
 
 export const api = new ApiService();

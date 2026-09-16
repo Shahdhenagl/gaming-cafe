@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\DeviceSession;
+use App\Models\Expense;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
@@ -31,6 +32,9 @@ class ReportController extends Controller
         $cafeRevenue = (float)$ordersToday->sum('total_amount');
         $gamingRevenue = (float)$sessionsToday->sum('session_cost');
         $totalRevenue = $cafeRevenue + $gamingRevenue;
+        $expensesToday = (float)Expense::whereDate('expense_date', $today)->sum('amount');
+        $cogsToday = (float)OrderItem::whereHas('order', fn ($q) => $q->whereDate('created_at', $today)->where('status', '!=', 'cancelled'))
+            ->selectRaw('COALESCE(SUM(quantity * cost_price), 0) as total')->value('total');
 
         // Occupancy rates
         $totalDevices = Device::count();
@@ -70,6 +74,9 @@ class ReportController extends Controller
                 'total_revenue_today' => $totalRevenue,
                 'cafe_revenue_today' => $cafeRevenue,
                 'gaming_revenue_today' => $gamingRevenue,
+                'expenses_today' => $expensesToday,
+                'cost_of_goods_today' => $cogsToday,
+                'net_profit_today' => $totalRevenue - $expensesToday - $cogsToday,
                 'cash_total' => (float)$cashPayments,
                 'card_total' => (float)$cardPayments,
                 'orders_count' => $ordersToday->count(),
@@ -102,6 +109,7 @@ class ReportController extends Controller
             ->get();
 
         $sessions = DeviceSession::where('created_at', '>=', $fromDate)->get();
+        $expenses = Expense::where('expense_date', '>=', $fromDate->toDateString())->get();
 
         $dailyStats = [];
         for ($i = $days - 1; $i >= 0; $i--) {
@@ -113,6 +121,9 @@ class ReportController extends Controller
 
             $dayCafe = (float)$dayOrders->sum('total_amount');
             $dayGaming = (float)$daySessions->sum('session_cost');
+            $dayExpenses = (float)$expenses->filter(fn($e) => $e->expense_date->format('Y-m-d') === $date)->sum('amount');
+            $dayCogs = (float)OrderItem::whereHas('order', fn ($q) => $q->whereDate('created_at', $date)->where('status', '!=', 'cancelled'))
+                ->selectRaw('COALESCE(SUM(quantity * cost_price), 0) as total')->value('total');
 
             $dailyStats[] = [
                 'date' => $date,
@@ -120,6 +131,9 @@ class ReportController extends Controller
                 'cafe_revenue' => $dayCafe,
                 'gaming_revenue' => $dayGaming,
                 'total_revenue' => $dayCafe + $dayGaming,
+                'expenses' => $dayExpenses,
+                'cost_of_goods' => $dayCogs,
+                'net_profit' => $dayCafe + $dayGaming - $dayExpenses - $dayCogs,
                 'orders_count' => $dayOrders->count(),
                 'sessions_count' => $daySessions->count(),
             ];
@@ -134,6 +148,12 @@ class ReportController extends Controller
         return response()->json([
             'daily_stats' => $dailyStats,
             'category_breakdown' => $categoryBreakdown,
+            'summary' => [
+                'revenue' => (float)$orders->sum('total_amount') + (float)$sessions->sum('session_cost'),
+                'expenses' => (float)$expenses->sum('amount'),
+                'cost_of_goods' => (float)OrderItem::whereHas('order', fn ($q) => $q->where('created_at', '>=', $fromDate)->where('status', '!=', 'cancelled'))
+                    ->selectRaw('COALESCE(SUM(quantity * cost_price), 0) as total')->value('total'),
+            ],
         ]);
     }
 }

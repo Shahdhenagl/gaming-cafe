@@ -64,6 +64,7 @@ export interface ActiveSessionData {
   start_time: string;
   end_time: string;
   duration_minutes: number;
+  is_open_ended?: boolean;
   remaining_seconds: number;
   is_ending_soon: boolean;
   is_ended: boolean;

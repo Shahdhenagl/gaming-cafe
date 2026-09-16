@@ -33,25 +33,27 @@ class SessionController extends Controller
         }
 
         $request->validate([
-            'duration_minutes' => 'required|integer|min:15|max:720',
+            'duration_minutes' => 'required_unless:is_open_ended,true|nullable|integer|min:15|max:720',
+            'is_open_ended' => 'nullable|boolean',
             'customer_name' => 'nullable|string|max:100',
             'customer_phone' => 'nullable|string|max:20',
             'discount' => 'nullable|numeric|min:0',
         ]);
 
-        $duration = (int)$request->duration_minutes;
+        $isOpenEnded = (bool)$request->boolean('is_open_ended');
+        $duration = $isOpenEnded ? 0 : (int)$request->duration_minutes;
         $hourlyRate = (float)$device->hourly_rate;
-        $sessionCost = round(($duration / 60) * $hourlyRate, 2);
+        $sessionCost = $isOpenEnded ? 0 : round(($duration / 60) * $hourlyRate, 2);
         $discount = (float)($request->discount ?? 0.00);
         $totalAmount = max(0, $sessionCost - $discount);
 
         $now = Carbon::now();
-        $endTime = (clone $now)->addMinutes($duration);
+        $endTime = $isOpenEnded ? (clone $now) : (clone $now)->addMinutes($duration);
 
         // Fetch active shift
         $shift = Shift::where('status', 'active')->latest()->first();
 
-        $session = DB::transaction(function () use ($device, $shift, $request, $now, $endTime, $duration, $hourlyRate, $sessionCost, $discount, $totalAmount) {
+        $session = DB::transaction(function () use ($device, $shift, $request, $now, $endTime, $duration, $isOpenEnded, $hourlyRate, $sessionCost, $discount, $totalAmount) {
             $session = DeviceSession::create([
                 'device_id' => $device->id,
                 'shift_id' => $shift ? $shift->id : null,
@@ -61,6 +63,7 @@ class SessionController extends Controller
                 'start_time' => $now,
                 'end_time' => $endTime,
                 'duration_minutes' => $duration,
+                'is_open_ended' => $isOpenEnded,
                 'status' => 'active',
                 'hourly_rate' => $hourlyRate,
                 'session_cost' => $sessionCost,
@@ -178,6 +181,7 @@ class SessionController extends Controller
                     'product_id' => $product->id,
                     'quantity' => $qty,
                     'unit_price' => $product->price,
+                    'cost_price' => $product->cost_price,
                     'subtotal' => $subtotal,
                     'notes' => $item['notes'] ?? null,
                 ]);
@@ -231,12 +235,21 @@ class SessionController extends Controller
 
         $paymentMethod = $request->payment_method;
         $discount = $request->filled('discount') ? (float)$request->discount : (float)$session->discount;
-        $finalTotal = max(0, $session->session_cost + $session->beverage_cost - $discount);
+        $elapsedMinutes = $session->is_open_ended
+            ? max(1, (int)ceil(Carbon::parse($session->start_time)->diffInSeconds(Carbon::now()) / 60))
+            : $session->duration_minutes;
+        $sessionCost = $session->is_open_ended
+            ? round(($elapsedMinutes / 60) * (float)$session->hourly_rate, 2)
+            : (float)$session->session_cost;
+        $finalTotal = max(0, $sessionCost + $session->beverage_cost - $discount);
         $amountPaid = $request->filled('amount_paid') ? (float)$request->amount_paid : $finalTotal;
 
-        DB::transaction(function () use ($session, $paymentMethod, $discount, $finalTotal, $amountPaid) {
+        DB::transaction(function () use ($session, $paymentMethod, $discount, $finalTotal, $amountPaid, $elapsedMinutes, $sessionCost) {
             $session->update([
                 'status' => 'ended',
+                'end_time' => Carbon::now(),
+                'duration_minutes' => $elapsedMinutes,
+                'session_cost' => $sessionCost,
                 'discount' => $discount,
                 'total_amount' => $finalTotal,
                 'paid_amount' => $amountPaid,

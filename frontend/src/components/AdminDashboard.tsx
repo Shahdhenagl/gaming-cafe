@@ -25,6 +25,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [expenseDraft, setExpenseDraft] = useState({ category: 'general', description: '', amount: '', expense_date: new Date().toISOString().slice(0, 10) });
 
   useEffect(() => {
     fetchDashboard();
@@ -33,17 +35,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
   const fetchDashboard = async () => {
     setLoading(true);
     try {
-      const [dash, anal] = await Promise.all([
+      const [dash, anal, expenseRes] = await Promise.all([
         api.getDashboardReport(),
         api.getAnalytics(7),
+        api.getExpenses(30).catch(() => ({ expenses: [] })),
       ]);
       setDashboardData(dash);
       setAnalyticsData(anal);
+      setExpenses(expenseRes.expenses || []);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
+  };
+
+  const addExpense = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!expenseDraft.description || !expenseDraft.amount) return;
+    await api.createExpense({ ...expenseDraft, amount: Number(expenseDraft.amount) });
+    setExpenseDraft({ ...expenseDraft, description: '', amount: '' });
+    await fetchDashboard();
   };
 
   if (loading || !dashboardData) {
@@ -137,6 +149,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
             {metrics.active_devices_count} of {metrics.total_devices_count} gaming stations active
           </p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="p-4 rounded-2xl bg-card border border-border"><p className="text-xs text-slate-400">Revenue today</p><p className="text-xl font-black text-emerald-400">{formatMoney(metrics?.total_revenue_today)} EGP</p></div>
+        <div className="p-4 rounded-2xl bg-card border border-border"><p className="text-xs text-slate-400">Expenses today</p><p className="text-xl font-black text-rose-400">{formatMoney(metrics?.expenses_today)} EGP</p></div>
+        <div className="p-4 rounded-2xl bg-card border border-border"><p className="text-xs text-slate-400">Product cost today</p><p className="text-xl font-black text-amber-400">{formatMoney(metrics?.cost_of_goods_today)} EGP</p></div>
+        <div className="p-4 rounded-2xl bg-card border border-border"><p className="text-xs text-slate-400">Net profit today</p><p className="text-xl font-black text-cyan-400">{formatMoney(metrics?.net_profit_today)} EGP</p></div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <form onSubmit={addExpense} className="lg:col-span-2 bg-card border border-border rounded-2xl p-5 space-y-3">
+          <h3 className="font-bold text-white">Add expense / إضافة مصروف</h3>
+          <input className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-sm" placeholder="Description / البيان" value={expenseDraft.description} onChange={e => setExpenseDraft({ ...expenseDraft, description: e.target.value })} />
+          <div className="grid grid-cols-2 gap-3"><input className="rounded-xl bg-surface border border-border px-3 py-2 text-sm" placeholder="Category" value={expenseDraft.category} onChange={e => setExpenseDraft({ ...expenseDraft, category: e.target.value })} /><input className="rounded-xl bg-surface border border-border px-3 py-2 text-sm" type="number" min="0" placeholder="Amount" value={expenseDraft.amount} onChange={e => setExpenseDraft({ ...expenseDraft, amount: e.target.value })} /></div>
+          <input className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-sm" type="date" value={expenseDraft.expense_date} onChange={e => setExpenseDraft({ ...expenseDraft, expense_date: e.target.value })} />
+          <button className="w-full rounded-xl bg-rose-600 hover:bg-rose-500 py-2 text-sm font-bold">Save expense</button>
+        </form>
+        <div className="lg:col-span-3 bg-card border border-border rounded-2xl p-5"><h3 className="font-bold text-white mb-3">Recent expenses / آخر المصروفات</h3><div className="space-y-2 max-h-52 overflow-auto">{expenses.map(exp => <div key={exp.id} className="flex justify-between border-b border-border/60 pb-2 text-sm"><span className="text-slate-300">{exp.description}<small className="block text-slate-500">{exp.category} • {exp.expense_date}</small></span><span className="font-mono text-rose-300">{formatMoney(exp.amount)} EGP</span></div>)}{expenses.length === 0 && <p className="text-slate-500 text-sm">No expenses recorded.</p>}</div></div>
       </div>
 
       {/* Analytics Charts & Trends */}

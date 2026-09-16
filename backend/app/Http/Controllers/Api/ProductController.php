@@ -82,6 +82,22 @@ class ProductController extends Controller
         ], 201);
     }
 
+    public function update(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'name_ar' => 'sometimes|string|max:255',
+            'category' => 'sometimes|in:hot_drinks,cold_drinks,soft_drinks,snacks,food',
+            'price' => 'sometimes|numeric|min:0',
+            'cost_price' => 'sometimes|numeric|min:0',
+            'stock_quantity' => 'sometimes|integer|min:0',
+            'reorder_level' => 'sometimes|integer|min:0',
+        ]);
+        $product->update($validated);
+        return response()->json(['message' => 'Product updated successfully', 'product' => $product]);
+    }
+
     /**
      * Adjust product stock (Restock or Adjustment).
      */

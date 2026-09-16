@@ -25,6 +25,9 @@ class DeviceController extends Controller
             $isEnded = false;
 
             if ($session) {
+                if ($session->is_open_ended) {
+                    $remainingSeconds = max(0, Carbon::parse($session->start_time)->diffInSeconds($now));
+                } else {
                 $endTime = Carbon::parse($session->end_time);
                 $diffSec = $now->diffInSeconds($endTime, false);
 
@@ -36,6 +39,7 @@ class DeviceController extends Controller
                     if ($remainingSeconds <= 600) { // 10 minutes or less
                         $isEndingSoon = true;
                     }
+                }
                 }
             }
 
@@ -56,6 +60,7 @@ class DeviceController extends Controller
                     'start_time' => $session->start_time->toISOString(),
                     'end_time' => $session->end_time->toISOString(),
                     'duration_minutes' => $session->duration_minutes,
+                    'is_open_ended' => (bool)$session->is_open_ended,
                     'remaining_seconds' => $remainingSeconds,
                     'is_ending_soon' => $isEndingSoon,
                     'is_ended' => $isEnded,
@@ -92,7 +97,7 @@ class DeviceController extends Controller
             'room_name_ar' => 'nullable|string',
             'device_name' => 'required|string',
             'device_name_ar' => 'nullable|string',
-            'device_type' => 'required|in:ps5,pc,xbox,sim,other',
+            'device_type' => 'required|in:ps5,ps4,billiards,pingpong,pc,xbox,sim,other',
             'hourly_rate' => 'required|numeric|min:0',
             'specs' => 'nullable|string',
         ]);
@@ -114,8 +119,10 @@ class DeviceController extends Controller
 
         $validated = $request->validate([
             'room_name' => 'sometimes|string',
+            'room_name_ar' => 'sometimes|nullable|string',
             'device_name' => 'sometimes|string',
-            'device_type' => 'sometimes|in:ps5,pc,xbox,sim,other',
+            'device_name_ar' => 'sometimes|nullable|string',
+            'device_type' => 'sometimes|in:ps5,ps4,billiards,pingpong,pc,xbox,sim,other',
             'status' => 'sometimes|in:available,active,maintenance',
             'hourly_rate' => 'sometimes|numeric|min:0',
             'specs' => 'nullable|string',

@@ -18,6 +18,7 @@ class DeviceSession extends Model
         'start_time',
         'end_time',
         'duration_minutes',
+        'is_open_ended',
         'status',
         'hourly_rate',
         'session_cost',
@@ -32,6 +33,7 @@ class DeviceSession extends Model
     protected $casts = [
         'start_time' => 'datetime',
         'end_time' => 'datetime',
+        'is_open_ended' => 'boolean',
         'hourly_rate' => 'float',
         'session_cost' => 'float',
         'beverage_cost' => 'float',

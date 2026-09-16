@@ -122,6 +122,7 @@ class OrderController extends Controller
                     'product_id' => $item['product']['id'],
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
+                    'cost_price' => $item['product']['cost_price'] ?? 0,
                     'subtotal' => $item['subtotal'],
                     'notes' => $item['notes'],
                 ]);

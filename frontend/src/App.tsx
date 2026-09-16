@@ -174,7 +174,7 @@ export function App() {
 
   const handleStartGamingSession = async (
     deviceId: number,
-    data: { duration_minutes: number; customer_name?: string; customer_phone?: string; discount?: number }
+    data: { duration_minutes?: number; is_open_ended?: boolean; customer_name?: string; customer_phone?: string; discount?: number }
   ) => {
     await api.startSession(deviceId, data);
     await loadInitialData();
@@ -374,7 +374,7 @@ export function App() {
               <AdminDashboard lang={lang} />
             )}
             {activeTab === 'management' && (
-              <ManagementDashboard lang={lang} products={products} devices={devices} user={user} />
+              <ManagementDashboard lang={lang} products={products} devices={devices} user={user} onRefresh={loadInitialData} />
             )}
           </div>
         )}

@@ -26,7 +26,7 @@ interface GamingRoomProps {
   lang: Language;
   devices: Device[];
   products: Product[];
-  onStartSession: (deviceId: number, data: { duration_minutes: number; customer_name?: string; customer_phone?: string; discount?: number }) => Promise<void>;
+  onStartSession: (deviceId: number, data: { duration_minutes?: number; is_open_ended?: boolean; customer_name?: string; customer_phone?: string; discount?: number }) => Promise<void>;
   onExtendSession: (sessionId: number, addedMinutes: number) => Promise<void>;
   onAddBeverageToSession: (sessionId: number, items: { product_id: number; quantity: number }[]) => Promise<void>;
   onEndSession: (sessionId: number, data: { payment_method: string; discount?: number; amount_paid?: number }) => Promise<ThermalReceipt | void>;
@@ -58,6 +58,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
   // Form states
   const [startDuration, setStartDuration] = useState<number>(60);
   const [startCustomDuration, setStartCustomDuration] = useState<string>('');
+  const [openEnded, setOpenEnded] = useState(false);
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
 
@@ -105,7 +106,9 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
         devices.forEach((d) => {
           if (d.active_session) {
             const current = next[d.id] !== undefined ? next[d.id] : Math.max(0, Math.floor(safeNum(d.active_session.remaining_seconds)));
-            if (current > 0) {
+            if (d.active_session.is_open_ended) {
+              next[d.id] = current + 1;
+            } else if (current > 0) {
               const updated = current - 1;
               next[d.id] = updated;
 
@@ -144,9 +147,8 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
     if (!startModalDevice) return;
     setActionLoading(true);
     try {
-      const finalDuration = startCustomDuration ? parseInt(startCustomDuration) : startDuration;
       await onStartSession(startModalDevice.id, {
-        duration_minutes: finalDuration,
+        ...(openEnded ? { is_open_ended: true } : { duration_minutes: startCustomDuration ? parseInt(startCustomDuration) : startDuration }),
         customer_name: customerName.trim() || undefined,
         customer_phone: customerPhone.trim() || undefined,
       });
@@ -154,6 +156,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
       setCustomerName('');
       setCustomerPhone('');
       setStartCustomDuration('');
+      setOpenEnded(false);
     } finally {
       setActionLoading(false);
     }
@@ -274,8 +277,8 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
         {filteredDevices.map((device) => {
           const session = device.active_session;
           const remainingSec = countdowns[device.id] ?? (session?.remaining_seconds || 0);
-          const isEndingSoon = remainingSec > 0 && remainingSec <= 600;
-          const isEnded = session && remainingSec <= 0;
+          const isEndingSoon = !session?.is_open_ended && remainingSec > 0 && remainingSec <= 600;
+          const isEnded = session && !session.is_open_ended && remainingSec <= 0;
 
           // Status colors
           let statusBorder = 'border-border/80';
@@ -368,7 +371,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                       }`}
                     >
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
-                        {t.remainingTime}
+                        {session.is_open_ended ? 'Elapsed time / وقت التشغيل' : t.remainingTime}
                       </span>
                       <span className="font-mono text-2xl font-black tracking-widest block" dir="ltr">
                         {formatTime(remainingSec)}
@@ -441,6 +444,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                       setStartModalDevice(device);
                       setStartDuration(60);
                       setStartCustomDuration('');
+                      setOpenEnded(false);
                     }}
                     disabled={device.status === 'maintenance'}
                     className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-xs shadow-neon-purple transition flex items-center justify-center gap-2 disabled:opacity-50"
@@ -480,7 +484,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                 <label className="block text-xs font-semibold text-slate-300 mb-2">
                   {t.selectDuration}
                 </label>
-                <div className="grid grid-cols-4 gap-2 mb-2">
+                <div className="grid grid-cols-5 gap-2 mb-2">
                   {[30, 60, 90, 120].map((mins) => (
                     <button
                       key={mins}
@@ -498,11 +502,13 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                       {mins < 60 ? `${mins}m` : `${mins / 60}h`}
                     </button>
                   ))}
+                  <button type="button" onClick={() => { setOpenEnded(true); setStartCustomDuration(''); }} className={`py-2 rounded-xl text-xs font-bold border ${openEnded ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-surface text-slate-300 border-border'}`}>Open</button>
                 </div>
                 <input
                   type="number"
                   placeholder={t.customMinutes}
-                  value={startCustomDuration}
+                  value={openEnded ? '' : startCustomDuration}
+                  disabled={openEnded}
                   onChange={(e) => setStartCustomDuration(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-surface border border-border text-white text-xs placeholder-slate-500 focus:outline-none focus:border-primary"
                 />
@@ -539,11 +545,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
               <div className="p-3 rounded-xl bg-surface border border-border flex justify-between items-center text-xs">
                 <span className="text-slate-400">Calculated Session Cost:</span>
                 <span className="font-mono font-bold text-emerald-400 text-sm" dir="ltr">
-                  {formatMoney(
-                    ((startCustomDuration ? parseInt(startCustomDuration) : startDuration) / 60) *
-                    startModalDevice.hourly_rate
-                  )}{' '}
-                  {t.currency}
+                  {openEnded ? 'Per minute until close' : `${formatMoney(((startCustomDuration ? parseInt(startCustomDuration) : startDuration) / 60) * startModalDevice.hourly_rate)} ${t.currency}`}
                 </span>
               </div>
 
