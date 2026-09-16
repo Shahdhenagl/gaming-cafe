@@ -6,6 +6,5 @@ backend/database/database.sqlite
 frontend/node_modules
 backend/node_modules
 backend/vendor
-frontend/dist
 tests
 storage/logs/*
