@@ -2,7 +2,14 @@
     root * /app/public
     encode zstd gzip
 
-    php_server {
-        try_files {path} index.php
+    # Laravel API routes
+    handle /api/* {
+        php_server
+    }
+
+    # React SPA: serve built assets and fall back to index.html for client routes
+    handle {
+        try_files {path} /index.html
+        file_server
     }
 }
