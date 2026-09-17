@@ -489,15 +489,17 @@ class MockStore {
     const now = Date.now();
     const updated = this.data.devices.map((dev) => {
       if (dev.active_session && dev.status === 'active') {
-        const endMs = new Date(dev.active_session.end_time).getTime();
-        const remSec = Math.max(0, Math.floor((endMs - now) / 1000));
+        const isOpenEnded = Boolean(dev.active_session.is_open_ended);
+        const remSec = isOpenEnded
+          ? Math.max(1, Math.floor((now - new Date(dev.active_session.start_time).getTime()) / 1000))
+          : Math.max(0, Math.floor((new Date(dev.active_session.end_time).getTime() - now) / 1000));
         return {
           ...dev,
           active_session: {
             ...dev.active_session,
             remaining_seconds: remSec,
-            is_ending_soon: remSec > 0 && remSec <= 600,
-            is_ended: remSec === 0,
+            is_ending_soon: !isOpenEnded && remSec > 0 && remSec <= 600,
+            is_ended: !isOpenEnded && remSec === 0,
           },
         };
       }
@@ -515,14 +517,15 @@ class MockStore {
     };
   }
 
-  startSession(deviceId: number, data: { duration_minutes: number; customer_name?: string; customer_phone?: string; discount?: number }) {
+  startSession(deviceId: number, data: { duration_minutes?: number; is_open_ended?: boolean; customer_name?: string; customer_phone?: string; discount?: number }) {
     const dev = this.data.devices.find((d) => d.id === deviceId);
     if (!dev) throw new Error('الجهاز غير موجود');
 
-    const duration = data.duration_minutes || 60;
+    const isOpenEnded = Boolean(data.is_open_ended);
+    const duration = isOpenEnded ? 0 : data.duration_minutes || 60;
     const startMs = Date.now();
-    const endMs = startMs + duration * 60000;
-    const cost = (duration / 60) * dev.hourly_rate;
+    const endMs = isOpenEnded ? startMs : startMs + duration * 60000;
+    const cost = isOpenEnded ? 0 : (duration / 60) * dev.hourly_rate;
 
     dev.status = 'active';
     dev.active_session = {
@@ -532,7 +535,8 @@ class MockStore {
       start_time: new Date(startMs).toISOString(),
       end_time: new Date(endMs).toISOString(),
       duration_minutes: duration,
-      remaining_seconds: duration * 60,
+      is_open_ended: isOpenEnded,
+      remaining_seconds: isOpenEnded ? 1 : duration * 60,
       is_ending_soon: false,
       is_ended: false,
       session_cost: cost,
@@ -591,10 +595,16 @@ class MockStore {
     if (!dev || !dev.active_session) throw new Error('الجلسة غير موجودة');
 
     const session = dev.active_session;
-    const finalAmount = Math.max(0, session.total_amount - (data.discount || 0));
+    const elapsedMinutes = session.is_open_ended
+      ? Math.max(1, Math.ceil((Date.now() - new Date(session.start_time).getTime()) / 60000))
+      : session.duration_minutes;
+    const sessionCost = session.is_open_ended
+      ? (elapsedMinutes / 60) * dev.hourly_rate
+      : session.session_cost;
+    const finalAmount = Math.max(0, sessionCost + session.beverage_cost - (data.discount || 0));
 
     if (this.data.currentShift) {
-      this.data.currentShift.total_before_deductions += session.total_amount;
+      this.data.currentShift.total_before_deductions += sessionCost + session.beverage_cost;
       this.data.currentShift.total_after_deductions += finalAmount;
       if (data.payment_method === 'cash') {
         this.data.currentShift.cash_collected += finalAmount;
@@ -613,11 +623,11 @@ class MockStore {
       device_name: dev.device_name_ar || dev.device_name,
       items: [
         {
-          name: 'وقت اللعب (' + session.duration_minutes + ' دقيقة)',
-          name_ar: 'وقت اللعب (' + session.duration_minutes + ' دقيقة)',
+          name: 'وقت اللعب (' + elapsedMinutes + ' دقيقة)',
+          name_ar: 'وقت اللعب (' + elapsedMinutes + ' دقيقة)',
           quantity: 1,
-          unit_price: session.session_cost,
-          subtotal: session.session_cost,
+          unit_price: sessionCost,
+          subtotal: sessionCost,
         },
         ...(session.beverage_cost > 0
           ? [
@@ -631,7 +641,7 @@ class MockStore {
             ]
           : []),
       ],
-      subtotal: session.session_cost + session.beverage_cost,
+      subtotal: sessionCost + session.beverage_cost,
       discount: data.discount || 0,
       tax: 0,
       total_amount: finalAmount,

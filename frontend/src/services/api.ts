@@ -86,6 +86,10 @@ class ApiService {
     return response.json();
   }
 
+  private canUseMockFallback(error: unknown): boolean {
+    return isLocalhost && error instanceof TypeError;
+  }
+
   // --- Auth ---
   async login(credentials: { email?: string; password?: string; pin?: string }): Promise<{ token: string; user: User }> {
     if (isStandalone) {
@@ -179,23 +183,43 @@ class ApiService {
   async deleteDevice(id: number) { return this.request(`/devices/${id}`, { method: 'DELETE' }); }
 
   async startSession(deviceId: number, data: { duration_minutes?: number; is_open_ended?: boolean; customer_name?: string; customer_phone?: string; discount?: number }) {
-    if (isStandalone) return mockStore.startSession(deviceId, { ...data, duration_minutes: data.duration_minutes || 60 });
-    return await this.request(`/devices/${deviceId}/session/start`, { method: 'POST', body: JSON.stringify(data) });
+    if (isStandalone) return mockStore.startSession(deviceId, data);
+    try {
+      return await this.request(`/devices/${deviceId}/session/start`, { method: 'POST', body: JSON.stringify(data) });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return mockStore.startSession(deviceId, data);
+      throw error;
+    }
   }
 
   async extendSession(sessionId: number, added_minutes: number) {
     if (isStandalone) return mockStore.extendSession(sessionId, added_minutes);
-    return await this.request(`/sessions/${sessionId}/extend`, { method: 'PATCH', body: JSON.stringify({ added_minutes }) });
+    try {
+      return await this.request(`/sessions/${sessionId}/extend`, { method: 'PATCH', body: JSON.stringify({ added_minutes }) });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return mockStore.extendSession(sessionId, added_minutes);
+      throw error;
+    }
   }
 
   async addBeverageToSession(sessionId: number, items: { product_id: number; quantity: number; notes?: string }[]) {
     if (isStandalone) return mockStore.addBeverageToSession(sessionId, items);
-    return await this.request(`/sessions/${sessionId}/add-beverage`, { method: 'PATCH', body: JSON.stringify({ items }) });
+    try {
+      return await this.request(`/sessions/${sessionId}/add-beverage`, { method: 'PATCH', body: JSON.stringify({ items }) });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return mockStore.addBeverageToSession(sessionId, items);
+      throw error;
+    }
   }
 
   async endSession(sessionId: number, data: { payment_method: string; discount?: number; amount_paid?: number }) {
     if (isStandalone) return mockStore.endSession(sessionId, data);
-    return await this.request<{ message: string; receipt: ThermalReceipt }>(`/sessions/${sessionId}/end`, { method: 'POST', body: JSON.stringify(data) });
+    try {
+      return await this.request<{ message: string; receipt: ThermalReceipt }>(`/sessions/${sessionId}/end`, { method: 'POST', body: JSON.stringify(data) });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return mockStore.endSession(sessionId, data);
+      throw error;
+    }
   }
 
   // --- POS Orders ---

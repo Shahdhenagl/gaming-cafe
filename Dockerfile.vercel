@@ -17,7 +17,7 @@ COPY backend/composer.json backend/composer.lock ./
 RUN composer install --no-dev --no-interaction --no-progress --no-scripts --optimize-autoloader --prefer-dist
 COPY backend/ ./
 COPY --from=frontend-build /app/frontend/dist/ ./public/
-RUN test -f ./public/index.html && test -f ./public/assets/index-*.js
+RUN test -f ./public/index.html && ls ./public/assets/index-*.js >/dev/null
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache \
     && composer dump-autoload --no-dev --classmap-authoritative
 
@@ -26,6 +26,7 @@ COPY --from=dependencies --chown=www-data:www-data /app /app
 COPY --chown=www-data:www-data Caddyfile /etc/frankenphp/Caddyfile
 COPY --chown=www-data:www-data docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp \
+    && sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
     && chmod +x /usr/local/bin/docker-entrypoint.sh \
     && chown -R www-data:www-data /config/caddy /data/caddy
 ENV PORT=80 \

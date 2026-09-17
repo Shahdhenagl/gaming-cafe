@@ -71,6 +71,14 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string>('');
 
+  const getOpenEndedElapsedSeconds = (startTime: string) =>
+    Math.max(1, Math.floor((Date.now() - new Date(startTime).getTime()) / 1000));
+
+  const getSelectedStartDuration = () => {
+    const customDuration = parseInt(startCustomDuration, 10);
+    return Number.isFinite(customDuration) && customDuration > 0 ? customDuration : startDuration;
+  };
+
   // Unique rooms list
   const rooms = ['all', ...Array.from(new Set(devices.map((d) => d.room_name)))];
 
@@ -96,7 +104,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
     devices.forEach((d) => {
       if (d.active_session) {
         initialCounts[d.id] = d.active_session.is_open_ended
-          ? Math.max(0, Math.floor((Date.now() - new Date(d.active_session.start_time).getTime()) / 1000))
+          ? getOpenEndedElapsedSeconds(d.active_session.start_time)
           : Math.max(0, Math.floor(safeNum(d.active_session.remaining_seconds)));
       }
     });
@@ -109,7 +117,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
         devices.forEach((d) => {
           if (d.active_session) {
             const current = next[d.id] !== undefined ? next[d.id] : d.active_session.is_open_ended
-              ? Math.max(0, Math.floor((Date.now() - new Date(d.active_session.start_time).getTime()) / 1000))
+              ? getOpenEndedElapsedSeconds(d.active_session.start_time)
               : Math.max(0, Math.floor(safeNum(d.active_session.remaining_seconds)));
             if (d.active_session.is_open_ended) {
               next[d.id] = current + 1;
@@ -159,8 +167,9 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
     setActionLoading(true);
     setActionError('');
     try {
+      const durationMinutes = getSelectedStartDuration();
       await onStartSession(startModalDevice.id, {
-        ...(openEnded ? { is_open_ended: true } : { duration_minutes: startCustomDuration ? parseInt(startCustomDuration) : startDuration }),
+        ...(openEnded ? { is_open_ended: true } : { duration_minutes: durationMinutes }),
         customer_name: customerName.trim() || undefined,
         customer_phone: customerPhone.trim() || undefined,
       });
@@ -511,9 +520,10 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                       onClick={() => {
                         setStartDuration(mins);
                         setStartCustomDuration('');
+                        setOpenEnded(false);
                       }}
                       className={`py-2 rounded-xl text-xs font-bold transition border ${
-                        startDuration === mins && !startCustomDuration
+                        !openEnded && startDuration === mins && !startCustomDuration
                           ? 'bg-primary text-white border-primary shadow-neon-purple'
                           : 'bg-surface text-slate-300 border-border hover:border-slate-500'
                       }`}
@@ -525,10 +535,15 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                 </div>
                 <input
                   type="number"
+                  min="15"
+                  max="720"
                   placeholder={t.customMinutes}
                   value={openEnded ? '' : startCustomDuration}
                   disabled={openEnded}
-                  onChange={(e) => setStartCustomDuration(e.target.value)}
+                  onChange={(e) => {
+                    setOpenEnded(false);
+                    setStartCustomDuration(e.target.value);
+                  }}
                   className="w-full px-3.5 py-2 rounded-xl bg-surface border border-border text-white text-xs placeholder-slate-500 focus:outline-none focus:border-primary"
                 />
               </div>
@@ -564,7 +579,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
               <div className="p-3 rounded-xl bg-surface border border-border flex justify-between items-center text-xs">
                 <span className="text-slate-400">Calculated Session Cost:</span>
                 <span className="font-mono font-bold text-emerald-400 text-sm" dir="ltr">
-                  {openEnded ? 'Per minute until close' : `${formatMoney(((startCustomDuration ? parseInt(startCustomDuration) : startDuration) / 60) * startModalDevice.hourly_rate)} ${t.currency}`}
+                  {openEnded ? 'Per minute until close' : `${formatMoney((getSelectedStartDuration() / 60) * startModalDevice.hourly_rate)} ${t.currency}`}
                 </span>
               </div>
 
