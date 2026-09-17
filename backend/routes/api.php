@@ -61,6 +61,7 @@ $apiRoutes = function () {
         Route::get('/inventory/report', [ProductController::class, 'inventoryReport']);
         Route::get('/expenses', [ExpenseController::class, 'index']);
         Route::post('/expenses', [ExpenseController::class, 'store']);
+        Route::patch('/expenses/{id}', [ExpenseController::class, 'update']);
         Route::delete('/expenses/{id}', [ExpenseController::class, 'destroy']);
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
