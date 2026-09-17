@@ -48,6 +48,9 @@ class ShiftController extends Controller
         $totalOrderRevenue = $orders->sum('total_amount');
         $totalSessionRevenue = $sessions->sum('session_cost');
         $totalRevenue = $totalOrderRevenue + $totalSessionRevenue;
+        $beverageCost = (float) $orders->sum(fn ($order) => $order->items()->sum(fn ($item) => $item->quantity * (float) $item->cost_price));
+        $beverageProfit = (float) $totalOrderRevenue - $beverageCost;
+        $gamingProfit = (float) $totalSessionRevenue;
 
         $cashRevenue = $orders->where('payment_method', 'cash')->sum('total_amount')
             + $sessions->where('payment_method', 'cash')->sum('session_cost');
@@ -83,6 +86,12 @@ class ShiftController extends Controller
                 'cash_revenue' => round($cashRevenue, 2),
                 'cash_expenses' => round($cashExpenses, 2),
                 'expenses_total' => round($expenses->sum('amount'), 2),
+                'gaming_revenue' => round($totalSessionRevenue, 2),
+                'gaming_profit' => round($gamingProfit, 2),
+                'beverage_revenue' => round($totalOrderRevenue, 2),
+                'beverage_cost' => round($beverageCost, 2),
+                'beverage_profit' => round($beverageProfit, 2),
+                'net_profit' => round($gamingProfit + $beverageProfit - $expenses->sum('amount'), 2),
                 'card_collected' => round($cardTotal, 2),
                 'average_order_value' => $orders->count() > 0 ? round($totalOrderRevenue / $orders->count(), 2) : 0.00,
             ]
@@ -141,6 +150,8 @@ class ShiftController extends Controller
         $expenses = Expense::where('shift_id', $shift->id)->get();
 
         $totalRevenue = $orders->sum('total_amount') + $sessions->sum('session_cost');
+        $beverageCost = (float) $orders->sum(fn ($order) => $order->items()->sum(fn ($item) => $item->quantity * (float) $item->cost_price));
+        $netProfit = (float) $sessions->sum('session_cost') + (float) $totalRevenue - (float) $sessions->sum('session_cost') - $beverageCost - (float) $expenses->sum('amount');
         $cashRevenue = $orders->where('payment_method', 'cash')->sum('total_amount')
             + $sessions->where('payment_method', 'cash')->sum('session_cost');
         $cashExpenses = $expenses->where('payment_method', 'cash')->sum('amount');
@@ -184,6 +195,15 @@ class ShiftController extends Controller
             'message' => 'Shift closed successfully',
             'shift' => $shift->load('staff'),
             'report' => $report,
+            'accounting' => [
+                'revenue' => round($totalRevenue, 2),
+                'gaming_profit' => round((float) $sessions->sum('session_cost'), 2),
+                'beverage_cost' => round($beverageCost, 2),
+                'beverage_profit' => round((float) $orders->sum('total_amount') - $beverageCost, 2),
+                'expenses_withdrawn' => round((float) $expenses->sum('amount'), 2),
+                'net_profit' => round($netProfit, 2),
+                'drawer_balance_after_close' => 0,
+            ],
         ]);
     }
 

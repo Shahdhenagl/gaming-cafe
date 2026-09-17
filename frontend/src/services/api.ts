@@ -482,6 +482,7 @@ class ApiService {
 
   async getExpenses(days = 30) { return this.request<{ expenses: any[]; total: number }>(`/expenses?days=${days}`); }
   async createExpense(data: { category: string; description: string; amount: number; payment_method: string; expense_date: string; notes?: string }) { return this.request('/expenses', { method: 'POST', body: JSON.stringify(data) }); }
+  async updateExpense(id: number, data: { category: string; description: string; amount: number; payment_method: string; expense_date: string; notes?: string }) { return this.request(`/expenses/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
   async deleteExpense(id: number) { return this.request(`/expenses/${id}`, { method: 'DELETE' }); }
 }
 

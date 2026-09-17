@@ -38,6 +38,13 @@ export interface ShiftMetrics {
   cash_collected: number;
   card_collected: number;
   average_order_value: number;
+  gaming_revenue?: number;
+  gaming_profit?: number;
+  beverage_revenue?: number;
+  beverage_cost?: number;
+  beverage_profit?: number;
+  expenses_total?: number;
+  net_profit?: number;
 }
 
 export type DeviceType = 'ps5' | 'ps4' | 'billiards' | 'pingpong' | 'pc' | 'xbox' | 'sim' | 'other';

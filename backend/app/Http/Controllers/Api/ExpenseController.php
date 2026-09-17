@@ -39,4 +39,19 @@ class ExpenseController extends Controller
         Expense::findOrFail($id)->delete();
         return response()->json(['message' => 'Expense deleted successfully']);
     }
+
+    public function update(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'category' => 'required|string|max:100',
+            'description' => 'required|string|max:255',
+            'amount' => 'required|numeric|min:0',
+            'payment_method' => 'required|in:cash,visa,wallet,instapay,bank_transfer,other',
+            'expense_date' => 'required|date',
+            'notes' => 'nullable|string',
+        ]);
+        $expense = Expense::findOrFail($id);
+        $expense->update($validated);
+        return response()->json(['message' => 'Expense updated successfully', 'expense' => $expense->load('staff')]);
+    }
 }
