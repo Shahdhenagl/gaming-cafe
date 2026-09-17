@@ -163,6 +163,10 @@ class ReportController extends Controller
                 'expenses' => (float)$expenses->sum('amount'),
                 'cost_of_goods' => (float)OrderItem::whereHas('order', fn ($q) => $q->where('created_at', '>=', $fromDate)->where('status', '!=', 'cancelled'))
                     ->selectRaw('COALESCE(SUM(quantity * cost_price), 0) as total')->value('total'),
+                'net_profit' => (float)$sessions->sum('session_cost') + (float)$orders->sum('total_amount')
+                    - (float)OrderItem::whereHas('order', fn ($q) => $q->where('created_at', '>=', $fromDate)->where('status', '!=', 'cancelled'))
+                        ->selectRaw('COALESCE(SUM(quantity * cost_price), 0) as total')->value('total')
+                    - (float)$expenses->sum('amount'),
             ],
         ]);
     }

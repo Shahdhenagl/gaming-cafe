@@ -40,13 +40,19 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
   const [history, setHistory] = useState<Shift[]>([]);
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [expenseFilter, setExpenseFilter] = useState<'today' | 'all'>('today');
+  const [todayReport, setTodayReport] = useState<any>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [expenseDraft, setExpenseDraft] = useState({ category: 'general', description: '', amount: '', payment_method: 'cash', expense_date: new Date().toISOString().slice(0, 10) });
 
   useEffect(() => {
     fetchHistory();
     api.getExpenses(30).then(res => setExpenses(res.expenses || [])).catch(() => undefined);
+    api.getAnalytics('day').then(res => setTodayReport(res.summary || null)).catch(() => undefined);
   }, []);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const visibleExpenses = expenseFilter === 'today' ? expenses.filter(exp => String(exp.expense_date).slice(0, 10) === today) : expenses;
 
   const fetchHistory = async () => {
     setLoadingHistory(true);
@@ -185,6 +191,14 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
         <div className="p-4 rounded-xl bg-card border border-border"><span className="text-xs text-slate-400 block">صافي الربح / Net profit</span><b className="text-emerald-300">{formatMoney(metrics?.net_profit)} {t.currency}</b></div>
       </div>}
 
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-bold text-white">تقفيل اليوم / Today closing</h3>
+          <div className="flex gap-2"><button type="button" onClick={() => setExpenseFilter('today')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${expenseFilter === 'today' ? 'bg-primary text-white' : 'bg-surface text-slate-400'}`}>اليوم / Today</button><button type="button" onClick={() => setExpenseFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${expenseFilter === 'all' ? 'bg-primary text-white' : 'bg-surface text-slate-400'}`}>كل الفترة / All</button></div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm"><div><span className="block text-slate-400">الإيراد</span><b className="text-emerald-300">{formatMoney(todayReport?.revenue)} {t.currency}</b></div><div><span className="block text-slate-400">تكلفة المشروبات</span><b className="text-amber-300">{formatMoney(todayReport?.cost_of_goods)} {t.currency}</b></div><div><span className="block text-slate-400">المصروفات</span><b className="text-rose-300">{formatMoney(todayReport?.expenses)} {t.currency}</b></div><div><span className="block text-slate-400">صافي الربح</span><b className="text-cyan-300">{formatMoney(todayReport?.net_profit)} {t.currency}</b></div></div>
+      </div>
+
       {/* Secondary Metrics Row */}
       {shift && shift.status === 'active' && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -221,7 +235,7 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
           <input required type="date" className="w-full rounded-xl bg-surface border border-border px-3 py-2 text-sm" value={expenseDraft.expense_date} onChange={e => setExpenseDraft({ ...expenseDraft, expense_date: e.target.value })} />
           <button className="w-full rounded-xl bg-rose-600 hover:bg-rose-500 py-2 text-sm font-bold">{editingExpenseId ? 'تعديل المصروف / Update expense' : 'حفظ المصروف / Save expense'}</button>
         </form>
-        <div className="lg:col-span-3 bg-card border border-border rounded-2xl p-5"><h3 className="font-bold text-white mb-3">مصروفات الوردية الأخيرة / Recent expenses</h3><div className="space-y-2 max-h-56 overflow-auto">{expenses.slice(0, 10).map(exp => <div key={exp.id} className="flex items-center justify-between gap-2 border-b border-border/60 pb-2 text-sm"><span className="text-slate-300">{exp.description}<small className="block text-slate-500">{exp.category} • {exp.payment_method === 'cash' ? 'خرج من الدرج' : exp.payment_method}</small></span><span className="font-mono text-rose-300">{formatMoney(exp.amount)} {t.currency}</span><button type="button" onClick={() => editExpense(exp)} className="text-cyan-300">تعديل</button><button type="button" onClick={() => removeExpense(exp.id)} className="text-rose-300">حذف</button></div>)}{expenses.length === 0 && <p className="text-slate-500 text-sm">لا توجد مصروفات مسجلة</p>}</div></div>
+        <div className="lg:col-span-3 bg-card border border-border rounded-2xl p-5"><h3 className="font-bold text-white mb-3">مصروفات {expenseFilter === 'today' ? 'اليوم / Today' : 'كل الفترة / All'}</h3><div className="space-y-2 max-h-56 overflow-auto">{visibleExpenses.slice(0, 10).map(exp => <div key={exp.id} className="flex items-center justify-between gap-2 border-b border-border/60 pb-2 text-sm"><span className="text-slate-300">{exp.description}<small className="block text-slate-500">{exp.category} • {exp.payment_method === 'cash' ? 'خرج من الدرج' : exp.payment_method}</small></span><span className="font-mono text-rose-300">{formatMoney(exp.amount)} {t.currency}</span><button type="button" onClick={() => editExpense(exp)} className="text-cyan-300">تعديل</button><button type="button" onClick={() => removeExpense(exp.id)} className="text-rose-300">حذف</button></div>)}{visibleExpenses.length === 0 && <p className="text-slate-500 text-sm">لا توجد مصروفات في الفلتر الحالي</p>}</div></div>
       </div>
 
       {/* Shift History Archive Table */}

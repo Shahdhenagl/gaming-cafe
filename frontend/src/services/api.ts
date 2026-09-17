@@ -442,6 +442,7 @@ class ApiService {
       sessions_count: number;
     }[];
       category_breakdown: any[];
+      summary?: { revenue: number; expenses: number; cost_of_goods: number; net_profit?: number };
   }> {
     const days = period === 'day' ? 1 : period === 'month' ? 30 : 7;
     if (isStandalone) return mockStore.getAnalytics(days);
