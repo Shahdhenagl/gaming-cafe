@@ -70,8 +70,10 @@ html.light ::-webkit-scrollbar-thumb { background: #b8c4d6; }
 
 /* Thermal Receipt Print Stylesheet */
 @media print {
+  @page { size: 80mm auto; margin: 0; }
+  html, body { width: 80mm; margin: 0 !important; padding: 0 !important; background: #fff !important; }
   body * { visibility: hidden; }
   #thermal-receipt, #thermal-receipt * { visibility: visible; }
-  #thermal-receipt { position: absolute; left: 0; top: 0; width: 80mm; margin: 0; padding: 10px; background: #fff !important; color: #000 !important; font-family: monospace !important; font-size: 12px !important; }
+  #thermal-receipt { position: absolute; left: 0; top: 0; width: 80mm !important; max-width: 80mm !important; box-sizing: border-box; margin: 0 !important; padding: 3mm !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; color: #000 !important; font-family: monospace !important; font-size: 11px !important; line-height: 1.25 !important; overflow: visible !important; }
   .no-print { display: none !important; }
 }

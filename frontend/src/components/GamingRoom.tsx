@@ -146,6 +146,12 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
     return formatSeconds(totalSeconds);
   };
 
+  const settlementSessionCost = endModalDevice?.active_session
+    ? endModalDevice.active_session.is_open_ended
+      ? Math.round(((countdowns[endModalDevice.id] || 0) / 60) * (endModalDevice.hourly_rate / 60) * 100) / 100
+      : safeNum(endModalDevice.active_session.session_cost)
+    : 0;
+
   // Handlers
   const handleStartSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -807,8 +813,8 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                   <span className="font-bold text-white">{endModalDevice.active_session.customer_name}</span>
                 </div>
                 <div className="flex justify-between text-slate-300">
-                  <span className="text-slate-400">{t.sessionCost} ({endModalDevice.active_session.duration_minutes}m):</span>
-                  <span className="font-mono" dir="ltr">{formatMoney(endModalDevice.active_session.session_cost)} {t.currency}</span>
+                    <span className="text-slate-400">{t.sessionCost} ({endModalDevice.active_session.is_open_ended ? `${formatTime(countdowns[endModalDevice.id] || 0)} مفتوح` : `${endModalDevice.active_session.duration_minutes}m`}):</span>
+                    <span className="font-mono" dir="ltr">{formatMoney(settlementSessionCost)} {t.currency}</span>
                 </div>
                 {safeNum(endModalDevice.active_session.beverage_cost) > 0 && (
                   <div className="flex justify-between text-slate-300">
@@ -831,7 +837,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                   <span className="font-mono text-emerald-400" dir="ltr">
                     {formatMoney(Math.max(
                       0,
-                      safeNum(endModalDevice.active_session.session_cost) +
+                      settlementSessionCost +
                         safeNum(endModalDevice.active_session.beverage_cost) -
                         (parseFloat(endDiscount) || 0)
                     ))}{' '}
