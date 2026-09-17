@@ -33,7 +33,7 @@ class SessionController extends Controller
         }
 
         $request->validate([
-            'duration_minutes' => 'required_unless:is_open_ended,true|nullable|integer|min:15|max:720',
+            'duration_minutes' => 'nullable|integer|min:15|max:720',
             'is_open_ended' => 'nullable|boolean',
             'customer_name' => 'nullable|string|max:100',
             'customer_phone' => 'nullable|string|max:20',
@@ -41,6 +41,9 @@ class SessionController extends Controller
         ]);
 
         $isOpenEnded = (bool)$request->boolean('is_open_ended');
+        if (!$isOpenEnded && !$request->filled('duration_minutes')) {
+            return response()->json(['message' => 'Choose a duration or select Open-ended mode.'], 422);
+        }
         $duration = $isOpenEnded ? 0 : (int)$request->duration_minutes;
         $hourlyRate = (float)$device->hourly_rate;
         $sessionCost = $isOpenEnded ? 0 : round(($duration / 60) * $hourlyRate, 2);

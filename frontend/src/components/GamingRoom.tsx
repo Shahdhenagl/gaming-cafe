@@ -69,6 +69,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
   const [endPaymentMethod, setEndPaymentMethod] = useState<string>('cash');
   const [endDiscount, setEndDiscount] = useState<string>('0');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [actionError, setActionError] = useState<string>('');
 
   // Unique rooms list
   const rooms = ['all', ...Array.from(new Set(devices.map((d) => d.room_name)))];
@@ -150,6 +151,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
     e.preventDefault();
     if (!startModalDevice) return;
     setActionLoading(true);
+    setActionError('');
     try {
       await onStartSession(startModalDevice.id, {
         ...(openEnded ? { is_open_ended: true } : { duration_minutes: startCustomDuration ? parseInt(startCustomDuration) : startDuration }),
@@ -161,6 +163,8 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
       setCustomerPhone('');
       setStartCustomDuration('');
       setOpenEnded(false);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not start session');
     } finally {
       setActionLoading(false);
     }
@@ -221,6 +225,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
 
   return (
     <div className="space-y-6">
+      {actionError && <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-300">{actionError}</div>}
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface/60 border border-border/80 p-4 lg:p-6 rounded-2xl">
         <div>

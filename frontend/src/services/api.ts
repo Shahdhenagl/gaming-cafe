@@ -180,50 +180,22 @@ class ApiService {
 
   async startSession(deviceId: number, data: { duration_minutes?: number; is_open_ended?: boolean; customer_name?: string; customer_phone?: string; discount?: number }) {
     if (isStandalone) return mockStore.startSession(deviceId, { ...data, duration_minutes: data.duration_minutes || 60 });
-    try {
-      return await this.request(`/devices/${deviceId}/session/start`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    } catch {
-      return mockStore.startSession(deviceId, { ...data, duration_minutes: data.duration_minutes || 60 });
-    }
+    return await this.request(`/devices/${deviceId}/session/start`, { method: 'POST', body: JSON.stringify(data) });
   }
 
   async extendSession(sessionId: number, added_minutes: number) {
     if (isStandalone) return mockStore.extendSession(sessionId, added_minutes);
-    try {
-      return await this.request(`/sessions/${sessionId}/extend`, {
-        method: 'PATCH',
-        body: JSON.stringify({ added_minutes }),
-      });
-    } catch {
-      return mockStore.extendSession(sessionId, added_minutes);
-    }
+    return await this.request(`/sessions/${sessionId}/extend`, { method: 'PATCH', body: JSON.stringify({ added_minutes }) });
   }
 
   async addBeverageToSession(sessionId: number, items: { product_id: number; quantity: number; notes?: string }[]) {
     if (isStandalone) return mockStore.addBeverageToSession(sessionId, items);
-    try {
-      return await this.request(`/sessions/${sessionId}/add-beverage`, {
-        method: 'PATCH',
-        body: JSON.stringify({ items }),
-      });
-    } catch {
-      return mockStore.addBeverageToSession(sessionId, items);
-    }
+    return await this.request(`/sessions/${sessionId}/add-beverage`, { method: 'PATCH', body: JSON.stringify({ items }) });
   }
 
   async endSession(sessionId: number, data: { payment_method: string; discount?: number; amount_paid?: number }) {
     if (isStandalone) return mockStore.endSession(sessionId, data);
-    try {
-      return await this.request<{ message: string; receipt: ThermalReceipt }>(`/sessions/${sessionId}/end`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    } catch {
-      return mockStore.endSession(sessionId, data);
-    }
+    return await this.request<{ message: string; receipt: ThermalReceipt }>(`/sessions/${sessionId}/end`, { method: 'POST', body: JSON.stringify(data) });
   }
 
   // --- POS Orders ---
