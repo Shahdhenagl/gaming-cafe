@@ -109,42 +109,39 @@ export function App() {
     }
   }, []);
 
+  const refreshOperationalData = useCallback(async () => {
+    const [devRes, tableRes] = await Promise.all([api.getDevices(), api.getTables()]);
+    if (devRes?.devices) setDevices(devRes.devices);
+    if (tableRes?.tables) setTables(tableRes.tables);
+  }, []);
+
   useEffect(() => {
     loadInitialData();
 
-    // Auto-refresh interval for active session timers, floor tables & alerts every 3.5 seconds
+    // Keep operational cards fresh without repeatedly loading heavy reports/notifications.
     const interval = setInterval(async () => {
       try {
-        const [devRes, tableRes, notifRes, shiftRes] = await Promise.all([
+        const [devRes, tableRes] = await Promise.all([
           api.getDevices(),
           api.getTables(),
-          api.getNotifications(),
-          api.getCurrentShift(),
         ]);
 
         if (devRes && devRes.devices) setDevices(devRes.devices);
         if (tableRes && tableRes.tables) setTables(tableRes.tables);
-        if (notifRes) {
-          const nextNotifications = notifRes.notifications || [];
-          setNotifications(nextNotifications);
-          setUnreadCount(notifRes.unread_count || 0);
-          nextNotifications.filter((n) => !n.is_read && !notifiedIds.current.has(n.id)).forEach((n) => {
-            notifiedIds.current.add(n.id);
-            if ('Notification' in window && Notification.permission === 'granted') {
-              navigator.serviceWorker?.ready.then((registration) => registration.showNotification(n.title, { body: n.message, icon: '/controller-icon.svg', tag: `notification-${n.id}` })).catch(() => undefined);
-            }
-          });
-        }
-        if (shiftRes) {
-          setShift(shiftRes.shift);
-          setMetrics(shiftRes.metrics);
-        }
       } catch (e) {
         // quiet polling error
       }
-    }, 3500);
+    }, 10000);
 
-    return () => clearInterval(interval);
+    const secondaryInterval = setInterval(async () => {
+      try {
+        const [notifRes, shiftRes] = await Promise.all([api.getNotifications(), api.getCurrentShift()]);
+        if (notifRes) { setNotifications(notifRes.notifications || []); setUnreadCount(notifRes.unread_count || 0); }
+        if (shiftRes) { setShift(shiftRes.shift); setMetrics(shiftRes.metrics); }
+      } catch { /* keep last known state */ }
+    }, 30000);
+
+    return () => { clearInterval(interval); clearInterval(secondaryInterval); };
   }, [loadInitialData]);
 
   // Actions
@@ -177,12 +174,12 @@ export function App() {
     data: { duration_minutes?: number; is_open_ended?: boolean; customer_name?: string; customer_phone?: string; discount?: number }
   ) => {
     await api.startSession(deviceId, data);
-    await loadInitialData();
+    await refreshOperationalData();
   };
 
   const handleExtendGamingSession = async (sessionId: number, addedMinutes: number) => {
     await api.extendSession(sessionId, addedMinutes);
-    await loadInitialData();
+    await refreshOperationalData();
   };
 
   const handleAddBeverageToSession = async (
@@ -190,7 +187,7 @@ export function App() {
     items: { product_id: number; quantity: number }[]
   ) => {
     await api.addBeverageToSession(sessionId, items);
-    await loadInitialData();
+    await refreshOperationalData();
   };
 
   const handleEndGamingSession = async (
@@ -198,7 +195,7 @@ export function App() {
     data: { payment_method: string; discount?: number; amount_paid?: number }
   ) => {
     const res = await api.endSession(sessionId, data);
-    await loadInitialData();
+    await refreshOperationalData();
     if (res && res.receipt) {
       setReceiptModalData(res.receipt);
     }
@@ -206,7 +203,7 @@ export function App() {
 
   const handlePosCheckout = async (data: any) => {
     const res = await api.createOrder(data);
-    await loadInitialData();
+    await refreshOperationalData();
 
     // Fetch thermal receipt for order
     let receipt: ThermalReceipt | undefined;
@@ -222,17 +219,17 @@ export function App() {
 
   const handleOccupyTable = async (tableId: number) => {
     await api.occupyTable(tableId);
-    await loadInitialData();
+    await refreshOperationalData();
   };
 
   const handleMoveTableToGaming = async (tableId: number, deviceSessionId: number) => {
     await api.moveTableToGaming(tableId, deviceSessionId);
-    await loadInitialData();
+    await refreshOperationalData();
   };
 
   const handleReleaseTable = async (tableId: number, paymentMethod: string) => {
     await api.releaseTable(tableId, paymentMethod);
-    await loadInitialData();
+    await refreshOperationalData();
   };
 
   const handleMarkNotifRead = async (id: number) => {

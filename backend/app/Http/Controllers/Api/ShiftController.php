@@ -24,15 +24,17 @@ class ShiftController extends Controller
         $user = $request->user();
         $staffId = $user ? $user->id : null;
 
-        $query = Shift::with('staff');
-        if ($staffId) {
-            $shift = $query->where('staff_id', $staffId)->where('status', 'active')->first();
-        } else {
-            $shift = $query->where('status', 'active')->latest()->first();
-        }
-
-        if (!$shift) {
-            $shift = Shift::with('staff')->latest()->first();
+        try {
+            $query = Shift::with('staff');
+            if ($staffId) {
+                $shift = $query->where('staff_id', $staffId)->where('status', 'active')->first();
+            } else {
+                $shift = $query->where('status', 'active')->latest()->first();
+            }
+            if (!$shift) $shift = Shift::with('staff')->latest()->first();
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['active' => false, 'shift' => null, 'metrics' => null, 'degraded' => true]);
         }
 
         if (!$shift) {
@@ -44,14 +46,14 @@ class ShiftController extends Controller
 
         try {
         // Aggregate shift metrics dynamically
-        $orders = Order::where('shift_id', $shift->id)->where('status', '!=', 'cancelled')->get();
+        $orders = Order::with('items')->where('shift_id', $shift->id)->where('status', '!=', 'cancelled')->get();
         $sessions = DeviceSession::where('shift_id', $shift->id)->get();
         $expenses = Expense::where('shift_id', $shift->id)->get();
 
         $totalOrderRevenue = $orders->sum('total_amount');
         $totalSessionRevenue = $sessions->sum(fn ($session) => $this->sessionRevenue($session));
         $totalRevenue = $totalOrderRevenue + $totalSessionRevenue;
-        $beverageCost = (float) $orders->sum(fn ($order) => $order->items()->sum(fn ($item) => $item->quantity * (float) $item->cost_price));
+        $beverageCost = (float) $orders->sum(fn ($order) => $order->items->sum(fn ($item) => $item->quantity * (float) $item->cost_price));
         $beverageProfit = (float) $totalOrderRevenue - $beverageCost;
         $gamingProfit = (float) $totalSessionRevenue;
 
@@ -63,10 +65,7 @@ class ShiftController extends Controller
         $cardTotal = $orders->where('payment_method', 'visa')->sum('total_amount')
             + $sessions->where('payment_method', 'visa')->sum(fn ($session) => $this->sessionRevenue($session));
 
-        $totalBeveragesCount = 0;
-        foreach ($orders as $order) {
-            $totalBeveragesCount += $order->items()->sum('quantity');
-        }
+        $totalBeveragesCount = $orders->sum(fn ($order) => $order->items->sum('quantity'));
 
         $now = Carbon::now();
         $startTime = Carbon::parse($shift->start_time);
