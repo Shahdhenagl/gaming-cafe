@@ -21,6 +21,9 @@ class NotificationController extends Controller
         // 1. Scan active sessions expiring within 10 minutes or ended
         $activeSessions = DeviceSession::with('device')->where('status', 'active')->get();
         foreach ($activeSessions as $session) {
+            if ($session->is_open_ended || !$session->end_time) {
+                continue;
+            }
             $endTime = Carbon::parse($session->end_time);
             $diffSeconds = $now->diffInSeconds($endTime, false);
 

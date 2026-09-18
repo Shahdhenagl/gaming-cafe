@@ -14,6 +14,7 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cost_price NUMERIC(8,2) NOT NUL
 
 -- Open-ended gaming sessions.
 ALTER TABLE device_sessions ALTER COLUMN end_time DROP NOT NULL;
+ALTER TABLE device_sessions ALTER COLUMN duration_minutes DROP NOT NULL;
 ALTER TABLE device_sessions ADD COLUMN IF NOT EXISTS is_open_ended BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Table timer starts when the table is occupied, not when the first order is created.

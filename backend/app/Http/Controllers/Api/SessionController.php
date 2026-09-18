@@ -54,14 +54,14 @@ class SessionController extends Controller
         if (!$isOpenEnded && !$request->filled('duration_minutes')) {
             return response()->json(['message' => 'Choose a duration or select Open-ended mode.'], 422);
         }
-        $duration = $isOpenEnded ? 0 : (int)$request->duration_minutes;
+        $duration = $isOpenEnded ? null : (int)$request->duration_minutes;
         $hourlyRate = (float)$device->hourly_rate;
         $sessionCost = $isOpenEnded ? 0 : round(($duration / 60) * $hourlyRate, 2);
         $discount = (float)($request->discount ?? 0.00);
         $totalAmount = max(0, $sessionCost - $discount);
 
         $now = Carbon::now();
-        $endTime = $isOpenEnded ? (clone $now) : (clone $now)->addMinutes($duration);
+        $endTime = $isOpenEnded ? null : (clone $now)->addMinutes($duration);
 
         // Fetch active shift
         $shift = Shift::where('status', 'active')->latest()->first();

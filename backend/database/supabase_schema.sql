@@ -99,7 +99,7 @@ CREATE TABLE device_sessions (
     customer_phone VARCHAR(50),
     start_time TIMESTAMPTZ DEFAULT NOW(),
     end_time TIMESTAMPTZ,
-    duration_minutes INTEGER NOT NULL,
+    duration_minutes INTEGER NULL,
     is_open_ended BOOLEAN NOT NULL DEFAULT FALSE,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'ended', 'paused')),
     hourly_rate NUMERIC(8, 2) DEFAULT 50.00,

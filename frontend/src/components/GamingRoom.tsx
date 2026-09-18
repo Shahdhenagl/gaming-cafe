@@ -72,7 +72,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
   const [actionError, setActionError] = useState<string>('');
 
   const getOpenEndedElapsedSeconds = (startTime: string) =>
-    Math.max(1, Math.floor((Date.now() - new Date(startTime).getTime()) / 1000));
+    Math.max(0, Math.floor((Date.now() - new Date(startTime).getTime()) / 1000));
 
   const getSelectedStartDuration = () => {
     const customDuration = parseInt(startCustomDuration, 10);
@@ -120,7 +120,9 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
               ? getOpenEndedElapsedSeconds(d.active_session.start_time)
               : Math.max(0, Math.floor(safeNum(d.active_session.remaining_seconds)));
             if (d.active_session.is_open_ended) {
-              next[d.id] = current + 1;
+              // Recalculate from the server start timestamp so refreshes,
+              // polling, and delayed renders never add an extra hour/minute.
+              next[d.id] = getOpenEndedElapsedSeconds(d.active_session.start_time);
             } else if (current > 0) {
               const updated = current - 1;
               next[d.id] = updated;

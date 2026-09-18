@@ -58,7 +58,7 @@ class DeviceController extends Controller
                     'customer_name' => $session->customer_name,
                     'customer_phone' => $session->customer_phone,
                     'start_time' => $session->start_time->toISOString(),
-                    'end_time' => $session->end_time->toISOString(),
+                    'end_time' => $session->end_time?->toISOString(),
                     'duration_minutes' => $session->duration_minutes,
                     'is_open_ended' => (bool)$session->is_open_ended,
                     'remaining_seconds' => $remainingSeconds,
