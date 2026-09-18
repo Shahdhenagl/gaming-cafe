@@ -60,6 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const t = translations[lang];
   const [currentTime, setCurrentTime] = useState<string>('');
+  const [shiftElapsedSeconds, setShiftElapsedSeconds] = useState(0);
   const [showNotifMenu, setShowNotifMenu] = useState<boolean>(false);
   const [showUserMenu, setShowUserMenu] = useState<boolean>(false);
 
@@ -79,6 +80,24 @@ export const Header: React.FC<HeaderProps> = ({
     const timer = setInterval(updateTime, 1000);
     return () => clearInterval(timer);
   }, [lang]);
+
+  useEffect(() => {
+    const updateShiftElapsed = () => {
+      if (!shift || shift.status !== 'active') {
+        setShiftElapsedSeconds(0);
+        return;
+      }
+      setShiftElapsedSeconds(Math.max(0, Math.floor((Date.now() - new Date(shift.start_time).getTime()) / 1000)));
+    };
+    updateShiftElapsed();
+    const timer = window.setInterval(updateShiftElapsed, 1000);
+    return () => window.clearInterval(timer);
+  }, [shift?.id, shift?.status, shift?.start_time]);
+
+  const shiftHours = Math.floor(shiftElapsedSeconds / 3600);
+  const shiftMinutes = Math.floor((shiftElapsedSeconds % 3600) / 60);
+  const shiftSeconds = shiftElapsedSeconds % 60;
+  const shiftElapsedFormatted = `${String(shiftHours).padStart(2, '0')}:${String(shiftMinutes).padStart(2, '0')}:${String(shiftSeconds).padStart(2, '0')}`;
 
   return (
     <header className="sticky top-0 z-40 bg-[#0c1022]/95 backdrop-blur-md border-b border-border/80 px-3 sm:px-4 lg:px-8 py-2.5 sm:py-3 transition-colors">
@@ -128,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {t.currentShift}:
                 </span>
                 <span className="font-mono font-bold text-emerald-400" dir="ltr">
-                  {metrics?.elapsed_time_formatted || '00:00:00'}
+                  {shiftElapsedFormatted}
                 </span>
               </div>
               <div className="h-4 w-px bg-border" />

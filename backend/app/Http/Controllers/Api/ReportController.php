@@ -30,7 +30,7 @@ class ReportController extends Controller
         $sessionsToday = DeviceSession::whereDate('created_at', $today)->get();
 
         $cafeRevenue = (float)$ordersToday->sum('total_amount');
-        $gamingRevenue = (float)$sessionsToday->sum('session_cost');
+        $gamingRevenue = (float)$sessionsToday->sum(fn ($session) => $this->sessionRevenue($session));
         $totalRevenue = $cafeRevenue + $gamingRevenue;
         $expensesToday = (float)Expense::whereDate('expense_date', $today)->sum('amount');
         $cogsToday = (float)OrderItem::whereHas('order', fn ($q) => $q->whereDate('created_at', $today)->where('status', '!=', 'cancelled'))
@@ -130,7 +130,7 @@ class ReportController extends Controller
             $daySessions = $sessions->filter(fn($s) => $s->created_at->format('Y-m-d') === $date);
 
             $dayCafe = (float)$dayOrders->sum('total_amount');
-            $dayGaming = (float)$daySessions->sum('session_cost');
+            $dayGaming = (float)$daySessions->sum(fn ($session) => $this->sessionRevenue($session));
             $dayExpenses = (float)$expenses->filter(fn($e) => $e->expense_date->format('Y-m-d') === $date)->sum('amount');
             $dayCogs = (float)OrderItem::whereHas('order', fn ($q) => $q->whereDate('created_at', $date)->where('status', '!=', 'cancelled'))
                 ->selectRaw('COALESCE(SUM(quantity * cost_price), 0) as total')->value('total');
@@ -159,15 +159,25 @@ class ReportController extends Controller
             'daily_stats' => $dailyStats,
             'category_breakdown' => $categoryBreakdown,
             'summary' => [
-                'revenue' => (float)$orders->sum('total_amount') + (float)$sessions->sum('session_cost'),
+                'revenue' => (float)$orders->sum('total_amount') + (float)$sessions->sum(fn ($session) => $this->sessionRevenue($session)),
                 'expenses' => (float)$expenses->sum('amount'),
                 'cost_of_goods' => (float)OrderItem::whereHas('order', fn ($q) => $q->where('created_at', '>=', $fromDate)->where('status', '!=', 'cancelled'))
                     ->selectRaw('COALESCE(SUM(quantity * cost_price), 0) as total')->value('total'),
-                'net_profit' => (float)$sessions->sum('session_cost') + (float)$orders->sum('total_amount')
+                'net_profit' => (float)$sessions->sum(fn ($session) => $this->sessionRevenue($session)) + (float)$orders->sum('total_amount')
                     - (float)OrderItem::whereHas('order', fn ($q) => $q->where('created_at', '>=', $fromDate)->where('status', '!=', 'cancelled'))
                         ->selectRaw('COALESCE(SUM(quantity * cost_price), 0) as total')->value('total')
                     - (float)$expenses->sum('amount'),
             ],
         ]);
+    }
+
+    private function sessionRevenue(DeviceSession $session): float
+    {
+        if (!$session->is_open_ended) {
+            return (float) $session->session_cost;
+        }
+
+        $minutes = max(1, (int) ceil(Carbon::parse($session->start_time)->diffInSeconds(Carbon::now()) / 60));
+        return round(($minutes / 60) * (float) $session->hourly_rate, 2);
     }
 }

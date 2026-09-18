@@ -20,6 +20,15 @@ ALTER TABLE device_sessions ADD COLUMN IF NOT EXISTS is_open_ended BOOLEAN NOT N
 -- Table timer starts when the table is occupied, not when the first order is created.
 ALTER TABLE tables ADD COLUMN IF NOT EXISTS occupied_at TIMESTAMPTZ NULL;
 
+-- Default cafe tables: create missing rows without duplicating existing ones.
+INSERT INTO tables (table_number, capacity, status, total_spent)
+SELECT v.table_number, v.capacity, 'available', 0.00
+FROM (VALUES
+    ('T-01', 2), ('T-02', 4), ('T-03', 4), ('T-04', 6), ('T-05', 2),
+    ('T-06', 4), ('T-07', 6), ('T-08', 8)
+) AS v(table_number, capacity)
+WHERE NOT EXISTS (SELECT 1 FROM tables t WHERE t.table_number = v.table_number);
+
 -- Expenses / money leaving the drawer.
 CREATE TABLE IF NOT EXISTS expenses (
     id BIGSERIAL PRIMARY KEY,

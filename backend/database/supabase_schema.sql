@@ -151,6 +151,7 @@ CREATE TABLE tables (
     status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'occupied')),
     current_order_id BIGINT,
     total_spent NUMERIC(10, 2) DEFAULT 0.00,
+    occupied_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

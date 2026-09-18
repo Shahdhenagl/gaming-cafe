@@ -46,19 +46,19 @@ class ShiftController extends Controller
         $expenses = Expense::where('shift_id', $shift->id)->get();
 
         $totalOrderRevenue = $orders->sum('total_amount');
-        $totalSessionRevenue = $sessions->sum('session_cost');
+        $totalSessionRevenue = $sessions->sum(fn ($session) => $this->sessionRevenue($session));
         $totalRevenue = $totalOrderRevenue + $totalSessionRevenue;
         $beverageCost = (float) $orders->sum(fn ($order) => $order->items()->sum(fn ($item) => $item->quantity * (float) $item->cost_price));
         $beverageProfit = (float) $totalOrderRevenue - $beverageCost;
         $gamingProfit = (float) $totalSessionRevenue;
 
         $cashRevenue = $orders->where('payment_method', 'cash')->sum('total_amount')
-            + $sessions->where('payment_method', 'cash')->sum('session_cost');
+            + $sessions->where('payment_method', 'cash')->sum(fn ($session) => $this->sessionRevenue($session));
         $cashExpenses = $expenses->where('payment_method', 'cash')->sum('amount');
         $cashTotal = max(0, $cashRevenue - $cashExpenses);
 
         $cardTotal = $orders->where('payment_method', 'visa')->sum('total_amount')
-            + $sessions->where('payment_method', 'visa')->sum('session_cost');
+            + $sessions->where('payment_method', 'visa')->sum(fn ($session) => $this->sessionRevenue($session));
 
         $totalBeveragesCount = 0;
         foreach ($orders as $order) {
@@ -67,15 +67,17 @@ class ShiftController extends Controller
 
         $now = Carbon::now();
         $startTime = Carbon::parse($shift->start_time);
-        $elapsedMinutes = $startTime->diffInMinutes($now);
-        $elapsedHours = floor($elapsedMinutes / 60);
-        $elapsedRemMinutes = $elapsedMinutes % 60;
+        $elapsedSeconds = max(0, $startTime->diffInSeconds($now));
+        $elapsedMinutes = (int) floor($elapsedSeconds / 60);
+        $elapsedHours = floor($elapsedSeconds / 3600);
+        $elapsedRemMinutes = floor(($elapsedSeconds % 3600) / 60);
+        $elapsedRemSeconds = $elapsedSeconds % 60;
 
         return response()->json([
             'active' => $shift->status === 'active',
             'shift' => $shift,
             'metrics' => [
-                'elapsed_time_formatted' => sprintf('%02d:%02d:00', $elapsedHours, $elapsedRemMinutes),
+                'elapsed_time_formatted' => sprintf('%02d:%02d:%02d', $elapsedHours, $elapsedRemMinutes, $elapsedRemSeconds),
                 'elapsed_minutes' => $elapsedMinutes,
                 'total_orders' => $orders->count(),
                 'total_sessions' => $sessions->count(),
@@ -149,15 +151,16 @@ class ShiftController extends Controller
         $sessions = DeviceSession::where('shift_id', $shift->id)->get();
         $expenses = Expense::where('shift_id', $shift->id)->get();
 
-        $totalRevenue = $orders->sum('total_amount') + $sessions->sum('session_cost');
+        $totalGamingRevenue = $sessions->sum(fn ($session) => $this->sessionRevenue($session));
+        $totalRevenue = $orders->sum('total_amount') + $totalGamingRevenue;
         $beverageCost = (float) $orders->sum(fn ($order) => $order->items()->sum(fn ($item) => $item->quantity * (float) $item->cost_price));
-        $netProfit = (float) $sessions->sum('session_cost') + (float) $totalRevenue - (float) $sessions->sum('session_cost') - $beverageCost - (float) $expenses->sum('amount');
+        $netProfit = (float) $totalRevenue - $beverageCost - (float) $expenses->sum('amount');
         $cashRevenue = $orders->where('payment_method', 'cash')->sum('total_amount')
-            + $sessions->where('payment_method', 'cash')->sum('session_cost');
+            + $sessions->where('payment_method', 'cash')->sum(fn ($session) => $this->sessionRevenue($session));
         $cashExpenses = $expenses->where('payment_method', 'cash')->sum('amount');
         $cashTotal = max(0, $cashRevenue - $cashExpenses);
         $cardTotal = $orders->where('payment_method', 'visa')->sum('total_amount')
-            + $sessions->where('payment_method', 'visa')->sum('session_cost');
+            + $sessions->where('payment_method', 'visa')->sum(fn ($session) => $this->sessionRevenue($session));
 
         $deductions = $request->deductions ?? 0.00;
         $totalAfterDeductions = max(0, $totalRevenue - $deductions);
@@ -197,7 +200,7 @@ class ShiftController extends Controller
             'report' => $report,
             'accounting' => [
                 'revenue' => round($totalRevenue, 2),
-                'gaming_profit' => round((float) $sessions->sum('session_cost'), 2),
+                'gaming_profit' => round((float) $totalGamingRevenue, 2),
                 'beverage_cost' => round($beverageCost, 2),
                 'beverage_profit' => round((float) $orders->sum('total_amount') - $beverageCost, 2),
                 'expenses_withdrawn' => round((float) $expenses->sum('amount'), 2),
@@ -232,5 +235,15 @@ class ShiftController extends Controller
         return response()->json([
             'shift' => $shift,
         ]);
+    }
+
+    private function sessionRevenue(DeviceSession $session): float
+    {
+        if (!$session->is_open_ended) {
+            return (float) $session->session_cost;
+        }
+
+        $minutes = max(1, (int) ceil(Carbon::parse($session->start_time)->diffInSeconds(Carbon::now()) / 60));
+        return round(($minutes / 60) * (float) $session->hourly_rate, 2);
     }
 }
