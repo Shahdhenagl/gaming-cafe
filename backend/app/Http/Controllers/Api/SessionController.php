@@ -28,10 +28,7 @@ class SessionController extends Controller
             return $this->startInternal($request, $deviceId);
         } catch (\Throwable $exception) {
             report($exception);
-            return response()->json([
-                'message' => 'Could not start session.',
-                'debug' => $request->header('X-Debug-Session') === '1' ? $exception->getMessage() : null,
-            ], 500);
+            return response()->json(['message' => 'Could not start session.'], 500);
         }
     }
 
@@ -97,10 +94,7 @@ class SessionController extends Controller
             });
         } catch (\Throwable $exception) {
             report($exception);
-            return response()->json([
-                'message' => 'Could not start session.',
-                'debug' => $request->header('X-Debug-Session') === '1' ? $exception->getMessage() : null,
-            ], 500);
+            return response()->json(['message' => 'Could not start session.'], 500);
         }
 
         return response()->json([
