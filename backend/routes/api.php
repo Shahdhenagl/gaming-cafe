@@ -12,11 +12,26 @@ use App\Http\Controllers\Api\SessionController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\TableController;
 use App\Http\Controllers\Api\UserController;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 $apiRoutes = function () {
     Route::get('/', function () {
         return response()->json(['system' => 'AL5AL Gaming, Billiards & Lounge Management System', 'status' => 'online', 'version' => '1.0.0']);
+    });
+    Route::get('/health/db', function () {
+        try {
+            DB::connection()->getPdo();
+            return response()->json(['status' => 'ok', 'driver' => config('database.default')]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'driver' => config('database.default'),
+                'error_class' => get_class($e),
+                'sql_state' => $e->errorInfo[0] ?? null,
+                'detail' => $e->errorInfo[2] ?? null,
+            ], 503);
+        }
     });
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::middleware('auth:sanctum')->group(function () {
