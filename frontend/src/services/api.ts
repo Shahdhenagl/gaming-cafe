@@ -131,7 +131,8 @@ class ApiService {
     try {
       return await this.request<{ active: boolean; shift: Shift | null; metrics: ShiftMetrics }>('/shifts/current');
     } catch {
-      return mockStore.getCurrentShift();
+      if (isLocalhost) return mockStore.getCurrentShift();
+      throw new Error('تعذر الاتصال ببيانات الوردية الحقيقية');
     }
   }
 
@@ -174,7 +175,8 @@ class ApiService {
     try {
       return await this.request<{ devices: Device[]; summary: { total_devices: number; active_devices: number; available_devices: number; maintenance_devices: number } }>('/devices');
     } catch {
-      return mockStore.getDevices();
+      if (isLocalhost) return mockStore.getDevices();
+      throw new Error('تعذر الاتصال ببيانات الأجهزة الحقيقية');
     }
   }
 
@@ -229,7 +231,8 @@ class ApiService {
       const query = new URLSearchParams(params as Record<string, string>).toString();
       return await this.request<{ data: Order[] }>(`/orders?${query}`);
     } catch {
-      return mockStore.getOrders();
+      if (isLocalhost) return mockStore.getOrders();
+      throw new Error('تعذر الاتصال ببيانات المبيعات الحقيقية');
     }
   }
 
@@ -250,8 +253,9 @@ class ApiService {
         method: 'POST',
         body: JSON.stringify(data),
       });
-    } catch {
-      return mockStore.createOrder(data);
+    } catch (error) {
+      if (isLocalhost) return mockStore.createOrder(data);
+      throw error;
     }
   }
 
@@ -320,7 +324,8 @@ class ApiService {
     try {
       return await this.request<{ tables: Table[]; summary: { total_tables: number; occupied_tables: number; available_tables: number } }>('/tables');
     } catch {
-      return mockStore.getTables();
+      if (isLocalhost) return mockStore.getTables();
+      throw new Error('تعذر الاتصال ببيانات الطاولات الحقيقية');
     }
   }
 
@@ -328,8 +333,9 @@ class ApiService {
     if (isStandalone) return mockStore.occupyTable(tableId);
     try {
       return await this.request(`/tables/${tableId}/occupy`, { method: 'PATCH' });
-    } catch {
-      return mockStore.occupyTable(tableId);
+    } catch (error) {
+      if (isLocalhost) return mockStore.occupyTable(tableId);
+      throw error;
     }
   }
 
@@ -368,7 +374,8 @@ class ApiService {
       const query = new URLSearchParams(params as Record<string, string>).toString();
       return await this.request(`/products?${query}`);
     } catch {
-      return mockStore.getProducts();
+      if (isLocalhost) return mockStore.getProducts();
+      throw new Error('تعذر الاتصال ببيانات المخزون الحقيقية');
     }
   }
 
