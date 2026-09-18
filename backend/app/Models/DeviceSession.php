@@ -35,6 +35,7 @@ class DeviceSession extends Model
         'end_time' => 'datetime',
         'is_open_ended' => 'boolean',
         'hourly_rate' => 'float',
+        'hourly_rate' => 'float',
         'session_cost' => 'float',
         'beverage_cost' => 'float',
         'discount' => 'float',

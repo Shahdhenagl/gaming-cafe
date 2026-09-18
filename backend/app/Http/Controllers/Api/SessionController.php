@@ -28,7 +28,7 @@ class SessionController extends Controller
             return $this->startInternal($request, $deviceId);
         } catch (\Throwable $exception) {
             report($exception);
-            return response()->json(['message' => 'Could not start session: ' . $exception->getMessage()], 500);
+            return response()->json(['message' => 'Could not start session.'], 500);
         }
     }
 
@@ -94,7 +94,7 @@ class SessionController extends Controller
             });
         } catch (\Throwable $exception) {
             report($exception);
-            return response()->json(['message' => 'Could not start session: ' . $exception->getMessage()], 500);
+            return response()->json(['message' => 'Could not start session.'], 500);
         }
 
         return response()->json([
