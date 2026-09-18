@@ -42,6 +42,7 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
   const [expenses, setExpenses] = useState<any[]>([]);
   const [expenseFilter, setExpenseFilter] = useState<'today' | 'all'>('today');
   const [todayReport, setTodayReport] = useState<any>(null);
+  const [finance, setFinance] = useState<any>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [expenseDraft, setExpenseDraft] = useState({ category: 'general', description: '', amount: '', payment_method: 'cash', expense_date: new Date().toISOString().slice(0, 10) });
 
@@ -49,7 +50,11 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
     fetchHistory();
     api.getExpenses(30).then(res => setExpenses(res.expenses || [])).catch(() => undefined);
     api.getAnalytics('day').then(res => setTodayReport(res.summary || null)).catch(() => undefined);
-  }, []);
+  }, [shift?.id]);
+
+  useEffect(() => {
+    api.getFinanceSummary(shift?.id).then(setFinance).catch(() => setFinance(null));
+  }, [shift?.id, shift?.status]);
 
   const today = new Date().toISOString().slice(0, 10);
   const visibleExpenses = expenseFilter === 'today' ? expenses.filter(exp => String(exp.expense_date).slice(0, 10) === today) : expenses;
@@ -190,6 +195,20 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
         <div className="p-4 rounded-xl bg-card border border-border"><span className="text-xs text-slate-400 block">المصروفات الخارجة / Withdrawn</span><b className="text-rose-300">{formatMoney(metrics?.expenses_total)} {t.currency}</b></div>
         <div className="p-4 rounded-xl bg-card border border-border"><span className="text-xs text-slate-400 block">صافي الربح / Net profit</span><b className="text-emerald-300">{formatMoney(metrics?.net_profit)} {t.currency}</b></div>
       </div>}
+
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h3 className="font-bold text-white">الماليات والخزنة الرئيسية</h3><p className="text-xs text-slate-400">كل المقبوضات حسب الشيفت ووسيلة الدفع مع تاريخ العملية</p></div>
+          <div className="text-right"><span className="block text-xs text-slate-400">رصيد الخزنة المرحّل</span><b className="text-xl text-emerald-300">{formatMoney(finance?.treasury?.balance)} {t.currency}</b></div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {([['cash','نقدي'], ['visa','بطاقة'], ['wallet','محفظة'], ['instapay','InstaPay'], ['installment','تقسيط'], ['other','أخرى']] as const).map(([method, label]) => {
+            const item = finance?.payment_breakdown?.[method] || { income: 0, count: 0 };
+            return <div key={method} className="rounded-xl bg-surface border border-border p-3"><span className="block text-xs text-slate-400">{label}</span><b className="block text-lg text-cyan-300" dir="ltr">{formatMoney(item.income)} {t.currency}</b><small className="text-slate-500">{item.count || 0} معاملات</small></div>;
+          })}
+        </div>
+        <div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="text-slate-400 border-b border-border"><th className="text-right p-2">التاريخ</th><th className="text-right p-2">البيان</th><th className="text-right p-2">الوسيلة</th><th className="text-left p-2">المبلغ</th></tr></thead><tbody>{(finance?.transactions || []).slice(0, 12).map((tx: any) => <tr key={tx.id} className="border-b border-border/50"><td className="p-2 text-slate-400" dir="ltr">{tx.date ? new Date(tx.date).toLocaleString('ar-EG') : '-'}</td><td className="p-2 text-slate-300">{tx.reference}</td><td className="p-2 text-slate-400">{tx.payment_method}</td><td className={tx.type === 'expense' ? 'p-2 text-left text-rose-300' : 'p-2 text-left text-emerald-300'} dir="ltr">{tx.type === 'expense' ? '-' : '+'}{formatMoney(tx.amount)} {t.currency}</td></tr>)}</tbody></table>{(finance?.transactions || []).length === 0 && <p className="text-center text-slate-500 py-4">لا توجد معاملات مسجلة</p>}</div>
+      </div>
 
       <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

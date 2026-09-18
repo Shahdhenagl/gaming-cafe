@@ -14,6 +14,7 @@ import { Device, Table } from '../types';
 import { Language, translations } from '../i18n/translations';
 import { sounds } from '../utils/audio';
 import { formatMoney } from '../utils/format';
+import { api } from '../services/api';
 
 interface TableManagementProps {
   lang: Language;
@@ -41,6 +42,8 @@ export const TableManagement: React.FC<TableManagementProps> = ({
   const [targetSessionId, setTargetSessionId] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [elapsedSeconds, setElapsedSeconds] = useState<Record<number, number>>({});
+  const [newTableName, setNewTableName] = useState('');
+  const [newTableCapacity, setNewTableCapacity] = useState('4');
 
   useEffect(() => {
     const sync = () => setElapsedSeconds(Object.fromEntries(tables.filter(t => t.status === 'occupied').map(t => [t.id, t.elapsed_seconds ?? (t.elapsed_minutes ?? 0) * 60])));
@@ -88,6 +91,21 @@ export const TableManagement: React.FC<TableManagementProps> = ({
     }
   };
 
+  const handleCreateTable = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newTableName.trim()) return;
+    await api.createTable({ table_number: newTableName.trim(), capacity: Number(newTableCapacity) || 4 });
+    setNewTableName('');
+    onRefresh();
+  };
+
+  const handleDeleteTable = async (table: Table) => {
+    if (table.status === 'occupied') return;
+    if (!window.confirm(`حذف الطاولة ${table.table_number}؟`)) return;
+    await api.deleteTable(table.id);
+    onRefresh();
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -102,6 +120,11 @@ export const TableManagement: React.FC<TableManagementProps> = ({
           </p>
         </div>
 
+        <form onSubmit={handleCreateTable} className="flex items-center gap-2">
+          <input value={newTableName} onChange={e => setNewTableName(e.target.value)} placeholder="اسم الطاولة" className="w-28 rounded-lg bg-card border border-border px-2 py-1.5 text-xs text-white" />
+          <input value={newTableCapacity} onChange={e => setNewTableCapacity(e.target.value)} type="number" min="1" max="50" className="w-14 rounded-lg bg-card border border-border px-2 py-1.5 text-xs text-white" />
+          <button className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">+ إضافة</button>
+        </form>
         {/* Legend */}
         <div className="flex items-center gap-4 text-xs font-semibold">
           <div className="flex items-center gap-1.5">
@@ -176,6 +199,7 @@ export const TableManagement: React.FC<TableManagementProps> = ({
                     Click to occupy / view
                   </span>
                 )}
+                {!isOccupied && <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteTable(table); }} className="text-[10px] text-rose-300 hover:text-rose-200">حذف</button>}
               </div>
             </div>
           );

@@ -7,6 +7,7 @@
 
 -- 1. CLEANUP OLD TABLES (IF RE-RUNNING)
 DROP TABLE IF EXISTS shift_reports CASCADE;
+DROP TABLE IF EXISTS treasury_entries CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS inventory_logs CASCADE;
 DROP TABLE IF EXISTS payments CASCADE;
@@ -241,6 +242,23 @@ CREATE TABLE shift_reports (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 16. MAIN TREASURY / SHIFT CLOSING ENTRIES
+CREATE TABLE treasury_entries (
+    id BIGSERIAL PRIMARY KEY,
+    shift_id BIGINT REFERENCES shifts(id) ON DELETE SET NULL,
+    staff_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    entry_type VARCHAR(30) NOT NULL DEFAULT 'shift_closing',
+    payment_method VARCHAR(30) NOT NULL,
+    amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    transaction_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reference VARCHAR(120),
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_treasury_entries_date ON treasury_entries(transaction_date);
+CREATE INDEX idx_treasury_entries_method ON treasury_entries(payment_method);
+
 -- ==============================================================================
 -- 16. SEED DATA - AL5AL GAMING & LOUNGE (صالة الخال)
 -- ==============================================================================
@@ -304,19 +322,6 @@ INSERT INTO device_sessions (id, device_id, shift_id, staff_id, customer_name, c
 (4, 8, 1, 3, 'Hazem & Omar (Ping Pong)', '01122334455', NOW() - INTERVAL '15 minutes', NOW() + INTERVAL '30 minutes', 45, 'active', 35.00, 26.25, 30.00, 56.25, 0.00, 'unpaid', NOW(), NOW());
 
 SELECT setval('device_sessions_id_seq', (SELECT MAX(id) FROM device_sessions));
-
--- TABLES
-INSERT INTO tables (id, table_number, capacity, status, total_spent, created_at, updated_at) VALUES
-(1, 'T-01', 2, 'available', 0.00, NOW(), NOW()),
-(2, 'T-02', 4, 'occupied', 115.00, NOW(), NOW()),
-(3, 'T-03', 4, 'occupied', 90.00, NOW(), NOW()),
-(4, 'T-04', 6, 'available', 0.00, NOW(), NOW()),
-(5, 'T-05', 2, 'available', 0.00, NOW(), NOW()),
-(6, 'T-06', 4, 'available', 0.00, NOW(), NOW()),
-(7, 'T-07', 6, 'occupied', 135.00, NOW(), NOW()),
-(8, 'T-08', 8, 'available', 0.00, NOW(), NOW());
-
-SELECT setval('tables_id_seq', (SELECT MAX(id) FROM tables));
 
 -- ORDERS
 INSERT INTO orders (id, order_number, shift_id, staff_id, status, order_type, table_id, device_session_id, subtotal, discount, tax, total_amount, payment_status, notes, created_at, updated_at) VALUES

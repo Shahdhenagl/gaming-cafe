@@ -72,6 +72,29 @@ class TableController extends Controller
         ]);
     }
 
+    public function store(Request $request)
+    {
+        $data = $request->validate(['table_number' => 'required|string|max:50|unique:tables,table_number', 'capacity' => 'nullable|integer|min:1|max:50']);
+        $table = Table::create(['table_number' => $data['table_number'], 'capacity' => $data['capacity'] ?? 4, 'status' => 'available', 'total_spent' => 0]);
+        return response()->json(['table' => $table], 201);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $table = Table::findOrFail($id);
+        $data = $request->validate(['table_number' => 'sometimes|required|string|max:50|unique:tables,table_number,' . $table->id, 'capacity' => 'sometimes|required|integer|min:1|max:50']);
+        $table->update($data);
+        return response()->json(['table' => $table->fresh()]);
+    }
+
+    public function destroy($id)
+    {
+        $table = Table::findOrFail($id);
+        if ($table->status === 'occupied' || $table->current_order_id) return response()->json(['message' => 'لا يمكن حذف طاولة مشغولة'], 422);
+        $table->delete();
+        return response()->json(['message' => 'تم حذف الطاولة']);
+    }
+
     /**
      * Show single table details.
      */

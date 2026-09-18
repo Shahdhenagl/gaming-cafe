@@ -333,6 +333,10 @@ class ApiService {
     }
   }
 
+  async createTable(data: { table_number: string; capacity: number }) { return this.request<{ table: Table }>('/tables', { method: 'POST', body: JSON.stringify(data) }); }
+  async updateTable(id: number, data: { table_number?: string; capacity?: number }) { return this.request<{ table: Table }>(`/tables/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
+  async deleteTable(id: number) { return this.request(`/tables/${id}`, { method: 'DELETE' }); }
+
   async moveTableToGaming(tableId: number, device_session_id: number) {
     if (isStandalone) return { message: 'تم نقل الطاولة للعبة بنجاح' };
     try {
@@ -478,6 +482,17 @@ class ApiService {
   }
 
   async getExpenses(days = 30) { return this.request<{ expenses: any[]; total: number }>(`/expenses?days=${days}`); }
+  async getFinanceSummary(shiftId?: number | null) {
+    const query = shiftId ? `?shift_id=${shiftId}` : '';
+    return this.request<{
+      payment_breakdown: Record<string, { income: number; expenses: number; net: number; count: number }>;
+      total_income: number;
+      total_expenses: number;
+      net_income: number;
+      transactions: { id: string; type: string; amount: number; payment_method: string; date: string; reference: string; status: string }[];
+      treasury: { entries: any[]; balance: number };
+    }>(`/finance/summary${query}`);
+  }
   async createExpense(data: { category: string; description: string; amount: number; payment_method: string; expense_date: string; notes?: string }) { return this.request('/expenses', { method: 'POST', body: JSON.stringify(data) }); }
   async updateExpense(id: number, data: { category: string; description: string; amount: number; payment_method: string; expense_date: string; notes?: string }) { return this.request(`/expenses/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
   async deleteExpense(id: number) { return this.request(`/expenses/${id}`, { method: 'DELETE' }); }

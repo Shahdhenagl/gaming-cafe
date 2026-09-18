@@ -8,6 +8,8 @@ use App\Models\Expense;
 use App\Models\Order;
 use App\Models\Shift;
 use App\Models\ShiftReport;
+use App\Models\Payment;
+use App\Models\TreasuryEntry;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -193,6 +195,29 @@ class ShiftController extends Controller
             'cash_transactions' => $cashTotal,
             'card_transactions' => $cardTotal,
         ]);
+
+        // Post one dated closing entry per payment method into the main treasury.
+        TreasuryEntry::where('shift_id', $shift->id)->where('entry_type', 'shift_closing')->delete();
+        foreach (['cash', 'visa', 'wallet', 'instapay', 'installment', 'other'] as $method) {
+            $income = Payment::where('status', 'confirmed')->where('payment_method', $method)
+                ->where(function ($query) use ($shift) {
+                    $query->whereHas('order', fn ($order) => $order->where('shift_id', $shift->id))
+                        ->orWhereHas('deviceSession', fn ($session) => $session->where('shift_id', $shift->id));
+                })->sum('amount');
+            $outgoing = $expenses->where('payment_method', $method)->sum('amount');
+            $amount = round((float) $income - (float) $outgoing, 2);
+            if ($amount == 0.0) continue;
+            TreasuryEntry::create([
+                'shift_id' => $shift->id,
+                'staff_id' => $shift->staff_id,
+                'entry_type' => 'shift_closing',
+                'payment_method' => $method,
+                'amount' => $amount,
+                'transaction_date' => $shift->end_time,
+                'reference' => 'SHIFT-' . $shift->id,
+                'notes' => 'ترحيل تقفيلة الشيفت إلى الخزنة الرئيسية',
+            ]);
+        }
 
         return response()->json([
             'message' => 'Shift closed successfully',

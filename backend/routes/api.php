@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
@@ -48,6 +49,9 @@ $apiRoutes = function () {
         Route::post('/orders/{id}/process-payment', [OrderController::class, 'processPayment']);
         Route::get('/orders/{id}/receipt', [OrderController::class, 'receipt']);
         Route::get('/tables', [TableController::class, 'index']);
+        Route::post('/tables', [TableController::class, 'store']);
+        Route::patch('/tables/{id}', [TableController::class, 'update']);
+        Route::delete('/tables/{id}', [TableController::class, 'destroy']);
         Route::get('/tables/{id}', [TableController::class, 'show']);
         Route::patch('/tables/{id}/occupy', [TableController::class, 'occupy']);
         Route::post('/tables/{id}/move-to-gaming', [TableController::class, 'moveToGaming']);
@@ -63,6 +67,8 @@ $apiRoutes = function () {
         Route::post('/expenses', [ExpenseController::class, 'store']);
         Route::patch('/expenses/{id}', [ExpenseController::class, 'update']);
         Route::delete('/expenses/{id}', [ExpenseController::class, 'destroy']);
+        Route::get('/finance/summary', [FinanceController::class, 'summary']);
+        Route::get('/finance/transactions', [FinanceController::class, 'transactions']);
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
         Route::patch('/users/{id}', [UserController::class, 'update']);

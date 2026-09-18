@@ -522,6 +522,11 @@ export const PosBar: React.FC<PosBarProps> = ({
                 </div>
               </div>
 
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-300">المبلغ المطلوب تحصيله / Amount to collect</span>
+                <strong className="text-2xl font-mono text-emerald-300" dir="ltr">{formatMoney(total)} {t.currency}</strong>
+              </div>
+
               {/* Cash Quick Tenders */}
               {paymentMethod === 'cash' && (
                 <div className="space-y-2">

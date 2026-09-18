@@ -20,14 +20,22 @@ ALTER TABLE device_sessions ADD COLUMN IF NOT EXISTS is_open_ended BOOLEAN NOT N
 -- Table timer starts when the table is occupied, not when the first order is created.
 ALTER TABLE tables ADD COLUMN IF NOT EXISTS occupied_at TIMESTAMPTZ NULL;
 
--- Default cafe tables: create missing rows without duplicating existing ones.
-INSERT INTO tables (table_number, capacity, status, total_spent)
-SELECT v.table_number, v.capacity, 'available', 0.00
-FROM (VALUES
-    ('T-01', 2), ('T-02', 4), ('T-03', 4), ('T-04', 6), ('T-05', 2),
-    ('T-06', 4), ('T-07', 6), ('T-08', 8)
-) AS v(table_number, capacity)
-WHERE NOT EXISTS (SELECT 1 FROM tables t WHERE t.table_number = v.table_number);
+CREATE TABLE IF NOT EXISTS treasury_entries (
+    id BIGSERIAL PRIMARY KEY,
+    shift_id BIGINT NULL REFERENCES shifts(id) ON DELETE SET NULL,
+    staff_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    entry_type VARCHAR(30) NOT NULL DEFAULT 'shift_closing',
+    payment_method VARCHAR(30) NOT NULL,
+    amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    transaction_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reference VARCHAR(120) NULL,
+    notes TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_treasury_date ON treasury_entries(transaction_date);
+CREATE INDEX IF NOT EXISTS idx_treasury_shift ON treasury_entries(shift_id);
+CREATE INDEX IF NOT EXISTS idx_treasury_method ON treasury_entries(payment_method);
 
 -- Expenses / money leaving the drawer.
 CREATE TABLE IF NOT EXISTS expenses (
