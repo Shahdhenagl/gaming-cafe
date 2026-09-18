@@ -55,6 +55,9 @@ class SessionController extends Controller
             return response()->json(['message' => 'Choose a duration or select Open-ended mode.'], 422);
         }
         $duration = $isOpenEnded ? null : (int)$request->duration_minutes;
+        // PDO/pgsql binds PHP booleans as integers in this deployment. Use
+        // PostgreSQL boolean literals for the insert.
+        $isOpenEndedDb = $isOpenEnded ? 'true' : 'false';
         $hourlyRate = (float)$device->hourly_rate;
         $sessionCost = $isOpenEnded ? 0 : round(($duration / 60) * $hourlyRate, 2);
         $discount = (float)($request->discount ?? 0.00);
@@ -67,7 +70,7 @@ class SessionController extends Controller
         $shift = Shift::where('status', 'active')->latest()->first();
 
         try {
-            $session = DB::transaction(function () use ($device, $shift, $request, $now, $endTime, $duration, $isOpenEnded, $hourlyRate, $sessionCost, $discount, $totalAmount) {
+            $session = DB::transaction(function () use ($device, $shift, $request, $now, $endTime, $duration, $isOpenEndedDb, $hourlyRate, $sessionCost, $discount, $totalAmount) {
             $session = DeviceSession::create([
                 'device_id' => $device->id,
                 'shift_id' => $shift ? $shift->id : null,
@@ -77,7 +80,7 @@ class SessionController extends Controller
                 'start_time' => $now,
                 'end_time' => $endTime,
                 'duration_minutes' => $duration,
-                'is_open_ended' => $isOpenEnded,
+                'is_open_ended' => $isOpenEndedDb,
                 'status' => 'active',
                 'hourly_rate' => $hourlyRate,
                 'session_cost' => $sessionCost,

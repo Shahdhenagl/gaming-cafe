@@ -69,8 +69,8 @@ export interface ActiveSessionData {
   customer_name: string;
   customer_phone?: string;
   start_time: string;
-  end_time: string;
-  duration_minutes: number;
+  end_time: string | null;
+  duration_minutes: number | null;
   is_open_ended?: boolean;
   remaining_seconds: number;
   is_ending_soon: boolean;

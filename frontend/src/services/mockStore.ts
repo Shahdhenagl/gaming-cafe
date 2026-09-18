@@ -491,8 +491,8 @@ class MockStore {
       if (dev.active_session && dev.status === 'active') {
         const isOpenEnded = Boolean(dev.active_session.is_open_ended);
         const remSec = isOpenEnded
-          ? Math.max(1, Math.floor((now - new Date(dev.active_session.start_time).getTime()) / 1000))
-          : Math.max(0, Math.floor((new Date(dev.active_session.end_time).getTime() - now) / 1000));
+          ? Math.max(0, Math.floor((now - new Date(dev.active_session.start_time).getTime()) / 1000))
+          : Math.max(0, Math.floor((new Date(dev.active_session.end_time || now).getTime() - now) / 1000));
         return {
           ...dev,
           active_session: {
@@ -533,8 +533,8 @@ class MockStore {
       customer_name: data.customer_name || 'عميل محترم',
       customer_phone: data.customer_phone,
       start_time: new Date(startMs).toISOString(),
-      end_time: new Date(endMs).toISOString(),
-      duration_minutes: duration,
+      end_time: isOpenEnded ? null : new Date(endMs).toISOString(),
+      duration_minutes: isOpenEnded ? null : duration,
       is_open_ended: isOpenEnded,
       remaining_seconds: isOpenEnded ? 1 : duration * 60,
       is_ending_soon: false,
@@ -556,12 +556,14 @@ class MockStore {
     if (!dev || !dev.active_session) throw new Error('الجلسة غير موجودة');
 
     const addedMs = added_minutes * 60000;
-    const currentEndMs = new Date(dev.active_session.end_time).getTime();
+    const currentEndMs = dev.active_session.end_time
+      ? new Date(dev.active_session.end_time).getTime()
+      : Date.now();
     const newEndMs = Math.max(Date.now(), currentEndMs) + addedMs;
     const addedCost = (added_minutes / 60) * dev.hourly_rate;
 
     dev.active_session.end_time = new Date(newEndMs).toISOString();
-    dev.active_session.duration_minutes += added_minutes;
+    dev.active_session.duration_minutes = (dev.active_session.duration_minutes || 0) + added_minutes;
     dev.active_session.session_cost += addedCost;
     dev.active_session.total_amount += addedCost;
     dev.active_session.remaining_seconds = Math.max(0, Math.floor((newEndMs - Date.now()) / 1000));
@@ -597,7 +599,7 @@ class MockStore {
     const session = dev.active_session;
     const elapsedMinutes = session.is_open_ended
       ? Math.max(1, Math.ceil((Date.now() - new Date(session.start_time).getTime()) / 60000))
-      : session.duration_minutes;
+      : (session.duration_minutes || 0);
     const sessionCost = session.is_open_ended
       ? (elapsedMinutes / 60) * dev.hourly_rate
       : session.session_cost;
