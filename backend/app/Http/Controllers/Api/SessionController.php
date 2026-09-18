@@ -56,7 +56,8 @@ class SessionController extends Controller
         // Fetch active shift
         $shift = Shift::where('status', 'active')->latest()->first();
 
-        $session = DB::transaction(function () use ($device, $shift, $request, $now, $endTime, $duration, $isOpenEnded, $hourlyRate, $sessionCost, $discount, $totalAmount) {
+        try {
+            $session = DB::transaction(function () use ($device, $shift, $request, $now, $endTime, $duration, $isOpenEnded, $hourlyRate, $sessionCost, $discount, $totalAmount) {
             $session = DeviceSession::create([
                 'device_id' => $device->id,
                 'shift_id' => $shift ? $shift->id : null,
@@ -79,8 +80,12 @@ class SessionController extends Controller
 
             $device->update(['status' => 'active']);
 
-            return $session;
-        });
+                return $session;
+            });
+        } catch (\Throwable $exception) {
+            report($exception);
+            return response()->json(['message' => 'Could not start session.', 'debug' => $exception->getMessage()], 500);
+        }
 
         return response()->json([
             'message' => 'Gaming session started successfully',
