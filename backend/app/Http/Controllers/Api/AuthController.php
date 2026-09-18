@@ -5,18 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    /**
-     * Login via Email + Password OR via 4-Digit PIN.
-     */
+    /** Login via Email + Password OR via 4-Digit PIN. */
     public function login(Request $request)
     {
-        try {
         $request->validate([
             'email' => 'nullable|email',
             'password' => 'nullable|string',
@@ -25,31 +20,21 @@ class AuthController extends Controller
 
         $user = null;
 
-        // Quick PIN login for staff
         if ($request->filled('pin')) {
             $user = User::where('pin_code', $request->pin)->first();
             if (!$user) {
-                return response()->json([
-                    'message' => 'Invalid PIN code. Please try again.',
-                ], 401);
+                return response()->json(['message' => 'Invalid PIN code. Please try again.'], 401);
             }
         } elseif ($request->filled('email') && $request->filled('password')) {
             $user = User::where('email', $request->email)->first();
             if (!$user || !Hash::check($request->password, $user->password)) {
-                return response()->json([
-                    'message' => 'Invalid email or password.',
-                ], 401);
+                return response()->json(['message' => 'Invalid email or password.'], 401);
             }
         } else {
-            return response()->json([
-                'message' => 'Please provide email and password, or your quick PIN.',
-            ], 422);
+            return response()->json(['message' => 'Please provide email and password, or your quick PIN.'], 422);
         }
 
-        // Generate Sanctum token
         $token = $user->createToken('auth-token')->plainTextToken;
-
-        // Load active shift if any
         $user->load('currentShift');
 
         return response()->json([
@@ -66,18 +51,9 @@ class AuthController extends Controller
                 'current_shift' => $user->currentShift,
             ],
         ]);
-        } catch (\Throwable $exception) {
-            report($exception);
-            return response()->json([
-                'message' => 'Login failed.',
-                'debug' => $request->header('X-Debug-Auth') === '1' ? $exception->getMessage() : null,
-            ], 500);
-        }
     }
 
-    /**
-     * Get Current Authenticated User & Shift.
-     */
+    /** Get Current Authenticated User & Shift. */
     public function user(Request $request)
     {
         $user = $request->user();
@@ -97,21 +73,17 @@ class AuthController extends Controller
                 'avatar' => $user->avatar,
                 'shift_id' => $user->shift_id,
                 'current_shift' => $user->currentShift,
-            ]
+            ],
         ]);
     }
 
-    /**
-     * Logout and revoke tokens.
-     */
+    /** Logout and revoke tokens. */
     public function logout(Request $request)
     {
         if ($request->user()) {
             $request->user()->currentAccessToken()->delete();
         }
 
-        return response()->json([
-            'message' => 'Logged out successfully',
-        ]);
+        return response()->json(['message' => 'Logged out successfully']);
     }
 }
