@@ -16,6 +16,7 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
+        try {
         $request->validate([
             'email' => 'nullable|email',
             'password' => 'nullable|string',
@@ -65,6 +66,13 @@ class AuthController extends Controller
                 'current_shift' => $user->currentShift,
             ],
         ]);
+        } catch (\Throwable $exception) {
+            report($exception);
+            return response()->json([
+                'message' => 'Login failed.',
+                'debug' => $request->header('X-Debug-Auth') === '1' ? $exception->getMessage() : null,
+            ], 500);
+        }
     }
 
     /**
