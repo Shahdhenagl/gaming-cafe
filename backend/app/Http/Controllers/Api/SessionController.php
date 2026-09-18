@@ -24,6 +24,19 @@ class SessionController extends Controller
      */
     public function start(Request $request, $deviceId)
     {
+        try {
+            return $this->startInternal($request, $deviceId);
+        } catch (\Throwable $exception) {
+            report($exception);
+            return response()->json([
+                'message' => 'Could not start session.',
+                'debug' => $request->header('X-Debug-Session') === '1' ? $exception->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    private function startInternal(Request $request, $deviceId)
+    {
         $device = Device::findOrFail($deviceId);
 
         if ($device->status === 'active') {
