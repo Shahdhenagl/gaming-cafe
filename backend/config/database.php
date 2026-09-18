@@ -81,7 +81,8 @@ return [
 
         'pgsql' => [
             'driver' => 'pgsql',
-            'url' => env('DB_URL'),
+            // Use the individual Supabase pooler variables; DB_URL may point to a stale host.
+            'url' => null,
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'laravel'),
@@ -95,6 +96,7 @@ return [
             'options' => extension_loaded('pdo_pgsql') ? [
                 // Supabase transaction poolers do not keep prepared statements between requests.
                 PDO::ATTR_EMULATE_PREPARES => true,
+                PDO::ATTR_TIMEOUT => (int) env('DB_CONNECT_TIMEOUT', 8),
             ] : [],
         ],
 
