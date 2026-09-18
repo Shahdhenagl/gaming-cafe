@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
-# Keep the production schema synchronized before serving API requests.
-php artisan migrate --force --no-interaction
+# The production Supabase schema is managed explicitly and already exists.
+# Running the complete Laravel migration history on every Vercel container boot
+# would try to recreate tables because this database does not use Laravel's
+# migration ledger. Start the application directly.
 exec frankenphp run --config /etc/frankenphp/Caddyfile
