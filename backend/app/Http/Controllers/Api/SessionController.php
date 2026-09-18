@@ -84,7 +84,10 @@ class SessionController extends Controller
             });
         } catch (\Throwable $exception) {
             report($exception);
-            return response()->json(['message' => 'Could not start session.', 'debug' => $exception->getMessage()], 500);
+            return response()->json([
+                'message' => 'Could not start session.',
+                'debug' => $request->header('X-Debug-Session') === '1' ? $exception->getMessage() : null,
+            ], 500);
         }
 
         return response()->json([

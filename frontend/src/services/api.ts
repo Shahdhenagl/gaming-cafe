@@ -30,7 +30,7 @@ const hasRemoteBackend = Boolean(API_URL && !API_URL.startsWith('/') && !isSameO
 const useBackendApi = import.meta.env.VITE_USE_BACKEND_API === 'true';
 const isVercelProduction = typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app');
 // Production is always the combined Laravel + React deployment. Mock mode is local-only.
-const isStandalone = !useBackendApi && !hasRemoteBackend && !isLocalhost && !isVercelProduction;
+const isStandalone = !useBackendApi && !hasRemoteBackend && isLocalhost;
 const BASE_URL = hasRemoteBackend ? API_URL : (isLocalhost ? 'http://127.0.0.1:8000/api' : '/api');
 
 class ApiService {
