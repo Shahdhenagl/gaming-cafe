@@ -42,6 +42,7 @@ class ShiftController extends Controller
             ]);
         }
 
+        try {
         // Aggregate shift metrics dynamically
         $orders = Order::where('shift_id', $shift->id)->where('status', '!=', 'cancelled')->get();
         $sessions = DeviceSession::where('shift_id', $shift->id)->get();
@@ -100,6 +101,22 @@ class ShiftController extends Controller
                 'average_order_value' => $orders->count() > 0 ? round($totalOrderRevenue / $orders->count(), 2) : 0.00,
             ]
         ]);
+        } catch (\Throwable $e) {
+            report($e);
+            $elapsedSeconds = max(0, (int) Carbon::parse($shift->start_time)->diffInSeconds(Carbon::now()));
+            return response()->json([
+                'active' => $shift->status === 'active',
+                'shift' => $shift,
+                'metrics' => [
+                    'elapsed_time_formatted' => sprintf('%02d:%02d:%02d', floor($elapsedSeconds / 3600), floor(($elapsedSeconds % 3600) / 60), $elapsedSeconds % 60),
+                    'elapsed_minutes' => (int) floor($elapsedSeconds / 60),
+                    'total_orders' => 0, 'total_sessions' => 0, 'active_sessions_count' => 0,
+                    'total_beverages_sold' => 0, 'total_revenue' => 0, 'cash_collected' => 0,
+                    'card_collected' => 0, 'average_order_value' => 0,
+                ],
+                'degraded' => true,
+            ]);
+        }
     }
 
     /**

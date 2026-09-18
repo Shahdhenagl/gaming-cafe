@@ -16,6 +16,7 @@ class NotificationController extends Controller
      */
     public function index()
     {
+        try {
         $now = Carbon::now();
 
         // 1. Scan active sessions expiring within 10 minutes or ended
@@ -78,6 +79,10 @@ class NotificationController extends Controller
                     'is_read' => false,
                 ]);
             }
+        }
+
+        } catch (\Throwable $e) {
+            report($e);
         }
 
         $notifications = Notification::latest()->take(30)->get();
