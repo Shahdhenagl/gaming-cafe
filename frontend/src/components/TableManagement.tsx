@@ -62,6 +62,8 @@ export const TableManagement: React.FC<TableManagementProps> = ({
 
   // Active gaming stations
   const activeStations = devices.filter((d) => d.active_session);
+  const occupiedCount = tables.filter((table) => table.status === 'occupied').length;
+  const availableCount = tables.length - occupiedCount;
 
   const handleMoveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,37 +110,28 @@ export const TableManagement: React.FC<TableManagementProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface/60 border border-border/80 p-4 lg:p-6 rounded-2xl">
-        <div>
-          <h2 className="text-xl lg:text-2xl font-black text-white flex items-center gap-2.5">
-            <Users className="w-7 h-7 text-amber-400" />
-            <span>{t.tablesTitle}</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            {t.tablesSubtitle}
-          </p>
+      <div className="rounded-2xl border border-border bg-surface/70 p-5 lg:p-6 space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black text-white flex items-center gap-3"><Users className="w-8 h-8 text-amber-400" />إدارة الطاولات والجلسات</h2>
+            <p className="text-sm text-slate-400 mt-2">تابعي حالة كل طاولة، افتحي حسابًا، أو انقلي الحساب إلى جهاز ألعاب.</p>
+          </div>
+          <div className="flex gap-2 text-center">
+            <div className="rounded-xl bg-card border border-border px-4 py-2"><b className="block text-xl text-white">{tables.length}</b><span className="text-[11px] text-slate-400">إجمالي الطاولات</span></div>
+            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-4 py-2"><b className="block text-xl text-emerald-300">{availableCount}</b><span className="text-[11px] text-slate-400">متاحة</span></div>
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-2"><b className="block text-xl text-amber-300">{occupiedCount}</b><span className="text-[11px] text-slate-400">مشغولة</span></div>
+          </div>
         </div>
-
-        <form onSubmit={handleCreateTable} className="flex items-center gap-2">
-          <input value={newTableName} onChange={e => setNewTableName(e.target.value)} placeholder="اسم الطاولة" className="w-28 rounded-lg bg-card border border-border px-2 py-1.5 text-xs text-white" />
-          <input value={newTableCapacity} onChange={e => setNewTableCapacity(e.target.value)} type="number" min="1" max="50" className="w-14 rounded-lg bg-card border border-border px-2 py-1.5 text-xs text-white" />
-          <button className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">+ إضافة</button>
+        <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-slate-200">لاختيار طاولة: اضغطي على كارت الطاولة. <span className="text-emerald-300">الأخضر = متاحة</span> ويمكن فتح حساب، و<span className="text-amber-300">الأصفر = مشغولة</span> ويمكن عرض الحساب أو دفعه أو نقله لجهاز ألعاب.</div>
+        <form onSubmit={handleCreateTable} className="rounded-xl bg-card border border-border p-4 flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="flex-1"><label className="block text-xs font-bold text-slate-300 mb-1.5">اسم الطاولة الجديدة</label><input value={newTableName} onChange={e => setNewTableName(e.target.value)} placeholder="مثال: طاولة VIP أو T1" className="w-full rounded-lg bg-surface border border-border px-3 py-2 text-sm text-white" /></div>
+          <div><label className="block text-xs font-bold text-slate-300 mb-1.5">عدد الأشخاص</label><input value={newTableCapacity} onChange={e => setNewTableCapacity(e.target.value)} type="number" min="1" max="50" className="w-full sm:w-28 rounded-lg bg-surface border border-border px-3 py-2 text-sm text-white" /></div>
+          <button className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-white">+ إضافة طاولة</button>
         </form>
-        {/* Legend */}
-        <div className="flex items-center gap-4 text-xs font-semibold">
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-neon-green" />
-            <span className="text-slate-300">{t.tableAvailable}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-amber-500 shadow-neon-amber" />
-            <span className="text-slate-300">{t.tableOccupied}</span>
-          </div>
-        </div>
       </div>
 
       {/* Tables Floor Plan Grid */}
+      {tables.length === 0 && <div className="rounded-2xl border-2 border-dashed border-border bg-card/40 p-10 text-center"><Users className="w-12 h-12 text-slate-500 mx-auto mb-3" /><h3 className="text-lg font-bold text-white">لا توجد طاولات مضافة</h3><p className="text-sm text-slate-400 mt-2">استخدمي نموذج «إضافة طاولة» بالأعلى، وستظهر الطاولة هنا مباشرة.</p></div>}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 lg:gap-5">
         {tables.map((table) => {
           const isOccupied = table.status === 'occupied';
@@ -157,7 +150,7 @@ export const TableManagement: React.FC<TableManagementProps> = ({
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-1.5 text-xs text-slate-400">
                     <Users className="w-3.5 h-3.5 text-slate-500" />
-                    <span>{table.capacity} {t.guests}</span>
+                    <span>تسع {table.capacity} أشخاص</span>
                   </div>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
@@ -171,7 +164,7 @@ export const TableManagement: React.FC<TableManagementProps> = ({
                 </div>
 
                 <div className="text-center py-2">
-                  <span className="text-2xl lg:text-3xl font-black text-white group-hover:text-amber-300 transition font-mono">
+                  <span className="text-2xl lg:text-3xl font-black text-white group-hover:text-amber-300 transition">
                     {table.table_number}
                   </span>
                   {isOccupied && (
@@ -195,8 +188,8 @@ export const TableManagement: React.FC<TableManagementProps> = ({
                     </span>
                   </>
                 ) : (
-                  <span className="text-slate-500 text-[11px] italic mx-auto">
-                    Click to occupy / view
+                  <span className="text-emerald-300 text-xs font-semibold mx-auto">
+                    اضغطي لفتح حساب الطاولة
                   </span>
                 )}
                 {!isOccupied && <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteTable(table); }} className="text-[10px] text-rose-300 hover:text-rose-200">حذف</button>}
@@ -214,7 +207,7 @@ export const TableManagement: React.FC<TableManagementProps> = ({
               <div className="flex items-center gap-2">
                 <Coffee className="w-5 h-5 text-amber-400" />
                 <h3 className="text-base font-bold text-white">
-                  Table {selectedTable.table_number}
+                  تفاصيل {selectedTable.table_number}
                 </h3>
               </div>
               <button
@@ -227,9 +220,9 @@ export const TableManagement: React.FC<TableManagementProps> = ({
 
             <div className="p-6 space-y-4">
               <div className="flex justify-between items-center text-xs pb-3 border-b border-border">
-                <span className="text-slate-400">Capacity:</span>
-                <span className="font-bold text-white">{selectedTable.capacity} Persons</span>
-                <span className="text-slate-400">Status:</span>
+                <span className="text-slate-400">السعة:</span>
+                <span className="font-bold text-white">{selectedTable.capacity} أشخاص</span>
+                <span className="text-slate-400">الحالة:</span>
                 <span
                   className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                     selectedTable.status === 'occupied'
@@ -237,7 +230,7 @@ export const TableManagement: React.FC<TableManagementProps> = ({
                       : 'bg-emerald-500/20 text-emerald-300'
                   }`}
                 >
-                  {selectedTable.status}
+                  {selectedTable.status === 'occupied' ? 'مشغولة' : 'متاحة'}
                 </span>
               </div>
 
@@ -283,7 +276,7 @@ export const TableManagement: React.FC<TableManagementProps> = ({
               ) : (
                 <div className="py-6 text-center space-y-2">
                   <p className="text-xs text-slate-400">
-                    Table is currently unoccupied.
+                    الطاولة متاحة حاليًا — هل تريدين فتح حساب جديد؟
                   </p>
                   <button
                     onClick={async () => {
@@ -293,7 +286,7 @@ export const TableManagement: React.FC<TableManagementProps> = ({
                     }}
                     className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-neon-amber transition"
                   >
-                    {t.occupyTable}
+                    فتح حساب جديد
                   </button>
                 </div>
               )}
@@ -312,7 +305,7 @@ export const TableManagement: React.FC<TableManagementProps> = ({
                     disabled={loading}
                     className="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-neon-green transition disabled:opacity-50"
                   >
-                    {t.releaseTable}
+                    تحصيل الحساب وإغلاق الطاولة
                   </button>
                 </div>
               )}
