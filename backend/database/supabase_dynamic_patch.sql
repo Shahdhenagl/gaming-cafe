@@ -37,6 +37,19 @@ CREATE INDEX IF NOT EXISTS idx_treasury_date ON treasury_entries(transaction_dat
 CREATE INDEX IF NOT EXISTS idx_treasury_shift ON treasury_entries(shift_id);
 CREATE INDEX IF NOT EXISTS idx_treasury_method ON treasury_entries(payment_method);
 
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    type VARCHAR(30) NOT NULL DEFAULT 'session_ending',
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    related_to VARCHAR(100) NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);
+
 -- Expenses / money leaving the drawer.
 CREATE TABLE IF NOT EXISTS expenses (
     id BIGSERIAL PRIMARY KEY,
