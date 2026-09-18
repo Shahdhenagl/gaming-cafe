@@ -67,7 +67,7 @@ class ShiftController extends Controller
 
         $now = Carbon::now();
         $startTime = Carbon::parse($shift->start_time);
-        $elapsedSeconds = max(0, $startTime->diffInSeconds($now));
+        $elapsedSeconds = max(0, (int) $startTime->diffInSeconds($now));
         $elapsedMinutes = (int) floor($elapsedSeconds / 60);
         $elapsedHours = floor($elapsedSeconds / 3600);
         $elapsedRemMinutes = floor(($elapsedSeconds % 3600) / 60);
