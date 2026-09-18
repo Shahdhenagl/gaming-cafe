@@ -28,7 +28,6 @@ const isSameOriginApi = typeof window !== 'undefined' && Boolean(API_URL) && (()
 // A Vercel static deployment is not the Laravel API. Never POST to its /api rewrite.
 const hasRemoteBackend = Boolean(API_URL && !API_URL.startsWith('/') && !isSameOriginApi);
 const useBackendApi = import.meta.env.VITE_USE_BACKEND_API === 'true';
-const isVercelProduction = typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app');
 // Production is always the combined Laravel + React deployment. Mock mode is local-only.
 const isStandalone = !useBackendApi && !hasRemoteBackend && isLocalhost;
 const BASE_URL = hasRemoteBackend ? API_URL : (isLocalhost ? 'http://127.0.0.1:8000/api' : '/api');
@@ -72,6 +71,10 @@ class ApiService {
       headers,
     });
 
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('استجابة غير صالحة من الخادم: يجب أن يكون مسار API متصلًا بـ Laravel وليس صفحة الواجهة');
+    }
     if (!response.ok) {
       let errorMsg = `HTTP Error ${response.status}`;
       try {
@@ -143,8 +146,9 @@ class ApiService {
         method: 'POST',
         body: JSON.stringify(data),
       });
-    } catch {
-      return mockStore.startShift(data);
+    } catch (error) {
+      if (isLocalhost) return mockStore.startShift(data);
+      throw error;
     }
   }
 
@@ -266,8 +270,9 @@ class ApiService {
         method: 'POST',
         body: JSON.stringify(data),
       });
-    } catch {
-      return { message: 'تم تسجيل الدفع بنجاح' };
+    } catch (error) {
+      if (isLocalhost) return { message: 'تم تسجيل الدفع بنجاح' };
+      throw error;
     }
   }
 
@@ -323,7 +328,7 @@ class ApiService {
     if (isStandalone) return mockStore.getTables();
     try {
       return await this.request<{ tables: Table[]; summary: { total_tables: number; occupied_tables: number; available_tables: number } }>('/tables');
-    } catch {
+    } catch (error) {
       if (isLocalhost) return mockStore.getTables();
       throw new Error('تعذر الاتصال ببيانات الطاولات الحقيقية');
     }
@@ -350,8 +355,9 @@ class ApiService {
         method: 'POST',
         body: JSON.stringify({ device_session_id }),
       });
-    } catch {
-      return { message: 'تم نقل الطاولة للعبة بنجاح' };
+    } catch (error) {
+      if (isLocalhost) return { message: 'تم نقل الطاولة للعبة بنجاح' };
+      throw error;
     }
   }
 
@@ -362,8 +368,9 @@ class ApiService {
         method: 'POST',
         body: JSON.stringify({ payment_method }),
       });
-    } catch {
-      return mockStore.releaseTable(tableId, payment_method);
+    } catch (error) {
+      if (isLocalhost) return mockStore.releaseTable(tableId, payment_method);
+      throw error;
     }
   }
 
@@ -394,8 +401,9 @@ class ApiService {
         method: 'PATCH',
         body: JSON.stringify(data),
       });
-    } catch {
-      return mockStore.updateStock(productId, data);
+    } catch (error) {
+      if (isLocalhost) return mockStore.updateStock(productId, data);
+      throw error;
     }
   }
 
@@ -403,8 +411,8 @@ class ApiService {
     if (isStandalone) return { logs: [], low_stock_products: [] };
     try {
       return await this.request('/inventory/report');
-    } catch {
-      return { logs: [], low_stock_products: [] };
+    } catch (error) {
+      throw error;
     }
   }
 
@@ -413,8 +421,9 @@ class ApiService {
     if (isStandalone) return mockStore.getNotifications();
     try {
       return await this.request<{ notifications: NotificationItem[]; unread_count: number }>('/notifications');
-    } catch {
-      return mockStore.getNotifications();
+    } catch (error) {
+      if (isLocalhost) return mockStore.getNotifications();
+      throw error;
     }
   }
 
@@ -422,8 +431,9 @@ class ApiService {
     if (isStandalone) return mockStore.markNotificationAsRead(id);
     try {
       return await this.request(`/notifications/${id}/read`, { method: 'PATCH' });
-    } catch {
-      return mockStore.markNotificationAsRead(id);
+    } catch (error) {
+      if (isLocalhost) return mockStore.markNotificationAsRead(id);
+      throw error;
     }
   }
 
@@ -431,8 +441,9 @@ class ApiService {
     if (isStandalone) return mockStore.markAllNotificationsAsRead();
     try {
       return await this.request('/notifications/read-all', { method: 'POST' });
-    } catch {
-      return mockStore.markAllNotificationsAsRead();
+    } catch (error) {
+      if (isLocalhost) return mockStore.markAllNotificationsAsRead();
+      throw error;
     }
   }
 
@@ -461,8 +472,9 @@ class ApiService {
     if (isStandalone) return mockStore.getDashboardReport();
     try {
       return await this.request('/reports/dashboard');
-    } catch {
-      return mockStore.getDashboardReport();
+    } catch (error) {
+      if (isLocalhost) return mockStore.getDashboardReport();
+      throw error;
     }
   }
 
@@ -483,8 +495,9 @@ class ApiService {
     if (isStandalone) return mockStore.getAnalytics(days);
     try {
       return await this.request(`/reports/analytics?period=${period}`);
-    } catch {
-      return mockStore.getAnalytics(days);
+    } catch (error) {
+      if (isLocalhost) return mockStore.getAnalytics(days);
+      throw error;
     }
   }
 
