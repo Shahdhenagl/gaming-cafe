@@ -32,6 +32,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [logs, setLogs] = useState<any[]>([]);
   const [loadingAction, setLoadingAction] = useState<number | null>(null);
+  const [restockProduct, setRestockProduct] = useState<Product | null>(null);
+  const [restockQty, setRestockQty] = useState('10');
+  const [purchaseTotal, setPurchaseTotal] = useState('');
+  const [purchaseMethod, setPurchaseMethod] = useState('cash');
 
   useEffect(() => {
     fetchLogs();
@@ -46,15 +50,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     }
   };
 
-  const handleQuickRestock = async (productId: number, qty: number) => {
-    setLoadingAction(productId);
+  const handleQuickRestock = async () => {
+    if (!restockProduct || Number(restockQty) <= 0) return;
+    if (!window.confirm(`تأكيد إضافة ${restockQty} قطعة وتسجيل قيمة الشراء كمصروف؟`)) return;
+    setLoadingAction(restockProduct.id);
     try {
-      await api.updateStock(productId, {
-        quantity_change: qty,
+      await api.updateStock(restockProduct.id, {
+        quantity_change: Number(restockQty),
         reason: 'restock',
+        purchase_total: Number(purchaseTotal || 0),
+        purchase_payment_method: purchaseMethod,
       });
       onRefreshProducts();
       fetchLogs();
+      setRestockProduct(null);
+      setPurchaseTotal('');
     } finally {
       setLoadingAction(null);
     }
@@ -159,10 +169,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           <button
                             key={qty}
                             disabled={loadingAction === prod.id}
-                            onClick={() => handleQuickRestock(prod.id, qty)}
+                            onClick={() => { setRestockProduct(prod); setRestockQty(String(qty)); }}
                             className="px-2.5 py-1 rounded-lg bg-surface border border-border hover:border-cyan-500 hover:text-cyan-300 text-slate-300 text-[11px] font-mono font-semibold transition"
                           >
-                            +{qty}
+                            +{qty} تأكيد
                           </button>
                         ))}
                       </div>
@@ -174,6 +184,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </table>
         </div>
       </div>
+
+      {restockProduct && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><div className="w-full max-w-md rounded-2xl bg-card border border-border p-5 space-y-4"><h3 className="text-white font-bold">إضافة مخزون: {restockProduct.name_ar}</h3><p className="text-xs text-slate-400">اكتب الكمية وإجمالي قيمة الشراء. سيتم تسجيلها كمصروف مشتريات وخصمها من الخزنة الرئيسية.</p><label className="block text-xs text-slate-300">عدد القطع<input type="number" min="1" value={restockQty} onChange={e => setRestockQty(e.target.value)} className="mt-1 w-full rounded-xl bg-surface border border-border px-3 py-2 text-white" /></label><label className="block text-xs text-slate-300">إجمالي قيمة الشراء<input type="number" min="0" step="0.01" value={purchaseTotal} onChange={e => setPurchaseTotal(e.target.value)} placeholder="0 إذا لم تدفع الآن" className="mt-1 w-full rounded-xl bg-surface border border-border px-3 py-2 text-white" /></label><label className="block text-xs text-slate-300">طريقة الدفع<select value={purchaseMethod} onChange={e => setPurchaseMethod(e.target.value)} className="mt-1 w-full rounded-xl bg-surface border border-border px-3 py-2 text-white"><option value="cash">نقدي / من الخزنة</option><option value="visa">Visa</option><option value="wallet">Wallet</option><option value="instapay">InstaPay</option><option value="bank_transfer">تحويل بنكي</option><option value="other">أخرى</option></select></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setRestockProduct(null)} className="px-4 py-2 rounded-xl bg-surface text-slate-300">إلغاء</button><button type="button" disabled={loadingAction === restockProduct.id} onClick={handleQuickRestock} className="px-4 py-2 rounded-xl bg-cyan-600 text-white font-bold">{loadingAction === restockProduct.id ? 'جاري الحفظ...' : 'تأكيد الإضافة'}</button></div></div></div>}
 
       {/* Audit Log Table */}
       <div className="bg-card border border-border rounded-2xl p-5 space-y-4">

@@ -407,7 +407,7 @@ class ApiService {
   async updateUser(id: number, data: Partial<User> & { password?: string }) { return this.request<{ user: User }>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
   async deleteUser(id: number) { return this.request(`/users/${id}`, { method: 'DELETE' }); }
 
-  async updateStock(productId: number, data: { quantity_change: number; reason: 'restock' | 'adjustment' | 'sale' }) {
+  async updateStock(productId: number, data: { quantity_change: number; reason: 'restock' | 'adjustment' | 'sale'; purchase_total?: number; purchase_payment_method?: string }) {
     if (isStandalone) return mockStore.updateStock(productId, data);
     try {
       return await this.request(`/products/${productId}/stock`, {
@@ -523,7 +523,7 @@ class ApiService {
       total_expenses: number;
       net_income: number;
       transactions: { id: string; type: string; amount: number; payment_method: string; date: string; reference: string; status: string }[];
-      treasury: { entries: any[]; balance: number };
+      treasury: { entries: any[]; balance: number; main_balance?: number; shop_balance?: number };
     }>(`/finance/summary${query}`);
   }
   async createExpense(data: { category: string; description: string; amount: number; payment_method: string; expense_date: string; notes?: string }) { return this.request('/expenses', { method: 'POST', body: JSON.stringify(data) }); }

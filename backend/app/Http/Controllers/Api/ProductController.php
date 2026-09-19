@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Expense;
 use App\Models\InventoryLog;
 use App\Models\Product;
+use App\Models\TreasuryEntry;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
@@ -116,19 +119,46 @@ class ProductController extends Controller
         $request->validate([
             'quantity_change' => 'required|integer',
             'reason' => 'required|in:restock,adjustment,sale',
+            'purchase_total' => 'nullable|numeric|min:0',
+            'purchase_payment_method' => 'nullable|in:cash,visa,wallet,instapay,bank_transfer,other',
         ]);
 
         $change = (int)$request->quantity_change;
         $newStock = max(0, $product->stock_quantity + $change);
 
-        $product->update(['stock_quantity' => $newStock]);
-
-        InventoryLog::create([
-            'product_id' => $product->id,
-            'quantity_change' => $change,
-            'reason' => $request->reason,
-            'staff_id' => $request->user() ? $request->user()->id : null,
-        ]);
+        DB::transaction(function () use ($product, $newStock, $change, $request) {
+            $product->update(['stock_quantity' => $newStock]);
+            InventoryLog::create([
+                'product_id' => $product->id,
+                'quantity_change' => $change,
+                'reason' => $request->reason,
+                'staff_id' => $request->user() ? $request->user()->id : null,
+            ]);
+            $purchaseTotal = (float) ($request->purchase_total ?? 0);
+            if ($request->reason === 'restock' && $purchaseTotal > 0) {
+                $shift = \App\Models\Shift::where('status', 'active')->latest()->first();
+                $method = $request->purchase_payment_method ?: 'cash';
+                Expense::create([
+                    'shift_id' => $shift?->id,
+                    'staff_id' => $request->user()?->id,
+                    'category' => 'purchases',
+                    'description' => "شراء مخزون: {$product->name} ({$change} قطعة)",
+                    'amount' => $purchaseTotal,
+                    'payment_method' => $method,
+                    'expense_date' => now()->toDateString(),
+                ]);
+                TreasuryEntry::create([
+                    'shift_id' => $shift?->id,
+                    'staff_id' => $request->user()?->id,
+                    'entry_type' => 'inventory_purchase',
+                    'payment_method' => $method,
+                    'amount' => -$purchaseTotal,
+                    'transaction_date' => now(),
+                    'reference' => 'STOCK-' . $product->id,
+                    'notes' => 'شراء مخزون من الخزنة الرئيسية',
+                ]);
+            }
+        });
 
         return response()->json([
             'message' => 'Stock updated successfully',

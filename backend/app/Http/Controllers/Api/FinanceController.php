@@ -47,6 +47,8 @@ class FinanceController extends Controller
             'treasury' => [
                 'entries' => $treasuryEntries,
                 'balance' => round((float) $treasuryEntries->sum('amount'), 2),
+                'main_balance' => round((float) $treasuryEntries->sum('amount'), 2),
+                'shop_balance' => $shiftId ? round((float) $payments->sum('amount') - (float) $expenses->where('category', '!=', 'purchases')->sum('amount'), 2) : 0,
             ],
         ]);
     }

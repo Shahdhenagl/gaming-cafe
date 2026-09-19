@@ -220,7 +220,7 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
       <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h3 className="font-bold text-white">الماليات والخزنة الرئيسية</h3><p className="text-xs text-slate-400">كل المقبوضات حسب الشيفت ووسيلة الدفع مع تاريخ العملية</p></div>
-          <div className="text-right"><span className="block text-xs text-slate-400">رصيد الخزنة المرحّل</span><b className="text-xl text-emerald-300">{formatMoney(finance?.treasury?.balance)} {t.currency}</b></div>
+          <div className="flex gap-5 text-right"><div><span className="block text-xs text-slate-400">الخزنة الرئيسية / Main</span><b className="text-xl text-emerald-300">{formatMoney(finance?.treasury?.main_balance ?? finance?.treasury?.balance)} {t.currency}</b></div><div><span className="block text-xs text-slate-400">خزنة المحل / Shop</span><b className="text-xl text-amber-300">{formatMoney(finance?.treasury?.shop_balance)} {t.currency}</b><small className="block text-slate-500">تتصفر بعد التقفيل</small></div></div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           {([['cash','نقدي'], ['visa','بطاقة'], ['wallet','محفظة'], ['instapay','InstaPay'], ['installment','تقسيط'], ['other','أخرى']] as const).map(([method, label]) => {

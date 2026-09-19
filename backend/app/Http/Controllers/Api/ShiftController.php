@@ -242,7 +242,8 @@ class ShiftController extends Controller
                     $query->whereHas('order', fn ($order) => $order->where('shift_id', $shift->id))
                         ->orWhereHas('deviceSession', fn ($session) => $session->where('shift_id', $shift->id));
                 })->sum('amount');
-            $outgoing = $expenses->where('payment_method', $method)->sum('amount');
+            // Inventory purchases were already withdrawn from the main vault at restock time.
+            $outgoing = $expenses->where('category', '!=', 'purchases')->where('payment_method', $method)->sum('amount');
             $amount = round((float) $income - (float) $outgoing, 2);
             if ($amount == 0.0) continue;
             TreasuryEntry::create([
