@@ -46,6 +46,7 @@ export function App() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [loadingInitial, setLoadingInitial] = useState<boolean>(true);
+  const [initialLoadError, setInitialLoadError] = useState<string | null>(null);
   const notifiedIds = useRef<Set<number>>(new Set());
 
   // Modals
@@ -73,14 +74,16 @@ export function App() {
 
   // Fetch all primary operational data
   const loadInitialData = useCallback(async () => {
+    let failedRequests = 0;
+    setInitialLoadError(null);
     try {
       const [userRes, shiftRes, devRes, prodRes, tableRes, notifRes] = await Promise.all([
         api.getCurrentUser().catch(() => ({ user: null })),
-        api.getCurrentShift().catch(() => ({ active: false, shift: null, metrics: null as any })),
-        api.getDevices().catch(() => ({ devices: [] })),
-        api.getProducts().catch(() => ({ products: [] })),
-        api.getTables().catch(() => ({ tables: [] })),
-        api.getNotifications().catch(() => ({ notifications: [], unread_count: 0 })),
+        api.getCurrentShift().catch(() => { failedRequests += 1; return { active: false, shift: null, metrics: null as any }; }),
+        api.getDevices().catch(() => { failedRequests += 1; return { devices: [] }; }),
+        api.getProducts().catch(() => { failedRequests += 1; return { products: [] }; }),
+        api.getTables().catch(() => { failedRequests += 1; return { tables: [] }; }),
+        api.getNotifications().catch(() => { failedRequests += 1; return { notifications: [], unread_count: 0 }; }),
       ]);
 
       if (userRes && userRes.user) setUser(userRes.user);
@@ -101,6 +104,9 @@ export function App() {
             navigator.serviceWorker?.ready.then((registration) => registration.showNotification(n.title, { body: n.message, icon: '/controller-icon.svg', tag: `notification-${n.id}` })).catch(() => undefined);
           }
         });
+      }
+      if (failedRequests > 0) {
+        setInitialLoadError('تعذر الاتصال ببعض خدمات Laravel. البيانات المعروضة قد تكون غير مكتملة.');
       }
     } catch (e) {
       console.error('Error loading initial data:', e);
@@ -326,6 +332,14 @@ export function App() {
           </div>
         ) : (
           <div>
+            {initialLoadError && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                <span>{initialLoadError}</span>
+                <button className="rounded-lg bg-amber-500 px-3 py-1.5 font-bold text-slate-950" onClick={() => void loadInitialData()}>
+                  إعادة المحاولة
+                </button>
+              </div>
+            )}
             {activeTab === 'gaming' && (
               <GamingRoom
                 lang={lang}

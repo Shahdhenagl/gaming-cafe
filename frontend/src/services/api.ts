@@ -66,10 +66,23 @@ class ApiService {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+    let response: Response;
+    try {
+      response = await fetch(`${BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+        signal: options.signal || controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('انتهت مهلة الاتصال بالخادم. تحقق من اتصال Laravel ثم أعد المحاولة.');
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
 
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
