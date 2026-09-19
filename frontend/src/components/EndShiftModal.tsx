@@ -26,6 +26,7 @@ export const EndShiftModal: React.FC<EndShiftModalProps> = ({
   const [deductions, setDeductions] = useState<string>('0');
   const [notes, setNotes] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen || !shift) return null;
 
@@ -35,6 +36,7 @@ export const EndShiftModal: React.FC<EndShiftModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setLoading(true);
     try {
       await onEndShift({
@@ -43,6 +45,8 @@ export const EndShiftModal: React.FC<EndShiftModalProps> = ({
         notes,
       });
       onClose();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر إغلاق الوردية. حاول مرة أخرى.');
     } finally {
       setLoading(false);
     }
@@ -147,6 +151,12 @@ export const EndShiftModal: React.FC<EndShiftModalProps> = ({
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+            {error && (
+              <div className="mr-auto max-w-[55%] flex items-start gap-1.5 text-xs text-rose-300" role="alert">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
             <button
               type="button"
               onClick={onClose}

@@ -165,13 +165,15 @@ class ShiftController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $orders = Order::where('shift_id', $shift->id)->where('status', '!=', 'cancelled')->get();
+        // Load items once: calling items()->sum() inside a collection callback
+        // creates an invalid/expensive query and can leave the close request hanging.
+        $orders = Order::with('items')->where('shift_id', $shift->id)->where('status', '!=', 'cancelled')->get();
         $sessions = DeviceSession::where('shift_id', $shift->id)->get();
         $expenses = Expense::where('shift_id', $shift->id)->get();
 
         $totalGamingRevenue = $sessions->sum(fn ($session) => $this->sessionRevenue($session));
         $totalRevenue = $orders->sum('total_amount') + $totalGamingRevenue;
-        $beverageCost = (float) $orders->sum(fn ($order) => $order->items()->sum(fn ($item) => $item->quantity * (float) $item->cost_price));
+        $beverageCost = (float) $orders->sum(fn ($order) => $order->items->sum(fn ($item) => $item->quantity * (float) $item->cost_price));
         $netProfit = (float) $totalRevenue - $beverageCost - (float) $expenses->sum('amount');
         $cashRevenue = $orders->where('payment_method', 'cash')->sum('total_amount')
             + $sessions->where('payment_method', 'cash')->sum(fn ($session) => $this->sessionRevenue($session));
@@ -199,7 +201,7 @@ class ShiftController extends Controller
         // Generate Shift Report
         $totalBeveragesCount = 0;
         foreach ($orders as $order) {
-            $totalBeveragesCount += $order->items()->sum('quantity');
+            $totalBeveragesCount += $order->items->sum('quantity');
         }
 
         $report = ShiftReport::create([
