@@ -93,8 +93,9 @@ class OrderController extends Controller
             }
 
             $discount = (float)($request->discount ?? 0.00);
-            $tax = (float)($request->tax ?? 0.00);
-            $totalAmount = max(0, $subtotal - $discount + $tax);
+            // Tax is disabled for AL5AL pricing; product prices are final.
+            $tax = 0.00;
+            $totalAmount = max(0, $subtotal - $discount);
 
             $paymentStatus = $request->order_type === 'take_away' ? 'paid' : ($request->payment_status ?? 'unpaid');
             $paymentMethod = $request->payment_method ?? 'cash';

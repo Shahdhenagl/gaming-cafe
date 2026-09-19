@@ -125,10 +125,6 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
                   <span>-{formatMoney(receipt.discount)} {t.currency}</span>
                 </div>
               )}
-              <div className="flex justify-between text-gray-600 text-[10px]">
-                <span>VAT (Included 15%):</span>
-                <span>{formatMoney((safeNum(receipt.total_amount) * 14) / 114)} {t.currency}</span>
-              </div>
               <div className="flex justify-between text-base font-black pt-1 border-t border-gray-400 font-mono">
                 <span>TOTAL:</span>
                 <span>{formatMoney(receipt.total_amount)} {t.currency}</span>
