@@ -28,7 +28,8 @@ class FinanceController extends Controller
                 'income' => round($income, 2),
                 'expenses' => round($outgoing, 2),
                 'net' => round($income - $outgoing, 2),
-                'count' => $payments->where('payment_method', $method)->count(),
+                'count' => $payments->where('payment_method', $method)->count()
+                    + $expenses->where('payment_method', $method)->count(),
             ];
         }
 
