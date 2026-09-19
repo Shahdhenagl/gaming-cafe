@@ -43,6 +43,8 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
   const [expenseFilter, setExpenseFilter] = useState<'today' | 'all'>('today');
   const [todayReport, setTodayReport] = useState<any>(null);
   const [finance, setFinance] = useState<any>(null);
+  const [closingReceipt, setClosingReceipt] = useState<{ shift: Shift; finance: any } | null>(null);
+  const [loadingReceiptId, setLoadingReceiptId] = useState<number | null>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [expenseDraft, setExpenseDraft] = useState({ category: 'general', description: '', amount: '', payment_method: 'cash', expense_date: new Date().toISOString().slice(0, 10) });
 
@@ -91,6 +93,25 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
     if (!window.confirm('حذف المصروف؟ / Delete expense?')) return;
     await api.deleteExpense(id);
     setExpenses(prev => prev.filter(exp => exp.id !== id));
+  };
+
+  const openClosingReceipt = async (closedShift: Shift) => {
+    setLoadingReceiptId(closedShift.id);
+    try {
+      const receiptFinance = await api.getFinanceSummary(closedShift.id);
+      setClosingReceipt({ shift: closedShift, finance: receiptFinance });
+    } finally {
+      setLoadingReceiptId(null);
+    }
+  };
+
+  const paymentLabels: Record<string, string> = {
+    cash: 'نقدي / Cash',
+    visa: 'بطاقة / Visa',
+    wallet: 'محفظة / Wallet',
+    instapay: 'InstaPay',
+    installment: 'تقسيط / Installment',
+    other: 'أخرى / Other',
   };
 
   return (
@@ -274,7 +295,8 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-80 overflow-auto rounded-xl border border-border">
+          <div className="min-w-[920px]">
           <table className="w-full text-left text-xs">
             <thead className="text-[10px] text-slate-400 uppercase bg-surface/60 border-y border-border">
               <tr>
@@ -285,12 +307,13 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
                 <th className="py-2.5 px-3">Gross Sales</th>
                 <th className="py-2.5 px-3">Cash / Card</th>
                 <th className="py-2.5 px-3">Status</th>
+                <th className="py-2.5 px-3">Receipt</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
               {history.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-6 text-slate-500">
+                  <td colSpan={8} className="text-center py-6 text-slate-500">
                     No past shifts found.
                   </td>
                 </tr>
@@ -336,13 +359,54 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
                         {s.status}
                       </span>
                     </td>
+                    <td className="py-3 px-3">
+                      <button
+                        type="button"
+                        onClick={() => void openClosingReceipt(s)}
+                        disabled={loadingReceiptId === s.id}
+                        className="inline-flex items-center gap-1 rounded-lg bg-primary/15 px-2.5 py-1.5 text-[10px] font-bold text-primary-light hover:bg-primary/25 disabled:opacity-50"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        {loadingReceiptId === s.id ? 'Loading...' : 'View closing'}
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
+
+      {closingReceipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border bg-surface/80 px-5 py-4">
+              <div>
+                <h3 className="flex items-center gap-2 font-black text-white"><FileText className="h-5 w-5 text-amber-300" /> فاتورة تقفيل الوردية / Shift Closing</h3>
+                <p className="mt-1 text-xs text-slate-400">وردية #{closingReceipt.shift.id} • {closingReceipt.shift.staff?.name || 'Staff'}</p>
+              </div>
+              <button type="button" onClick={() => setClosingReceipt(null)} className="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-300 hover:bg-surface">إغلاق</button>
+            </div>
+            <div className="max-h-[calc(92vh-145px)] overflow-y-auto p-5">
+              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-xl bg-surface p-3"><span className="block text-[10px] text-slate-400">من / From</span><b className="text-xs text-white">{new Date(closingReceipt.shift.start_time).toLocaleString('ar-EG')}</b></div>
+                <div className="rounded-xl bg-surface p-3"><span className="block text-[10px] text-slate-400">إلى / To</span><b className="text-xs text-white">{closingReceipt.shift.end_time ? new Date(closingReceipt.shift.end_time).toLocaleString('ar-EG') : '-'}</b></div>
+                <div className="rounded-xl bg-surface p-3"><span className="block text-[10px] text-slate-400">إجمالي القبض</span><b className="text-emerald-300" dir="ltr">{formatMoney(closingReceipt.finance.total_income)} {t.currency}</b></div>
+                <div className="rounded-xl bg-surface p-3"><span className="block text-[10px] text-slate-400">إجمالي المصروف</span><b className="text-rose-300" dir="ltr">{formatMoney(closingReceipt.finance.total_expenses)} {t.currency}</b></div>
+              </div>
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full min-w-[560px] text-xs"><thead className="bg-surface text-slate-400"><tr><th className="p-3 text-right">وسيلة الدفع</th><th className="p-3 text-left">الإيراد</th><th className="p-3 text-left">المصروفات</th><th className="p-3 text-left">الصافي</th><th className="p-3 text-left">عدد العمليات</th></tr></thead>
+                  <tbody className="divide-y divide-border/60">{Object.entries(closingReceipt.finance.payment_breakdown || {}).map(([method, item]: [string, any]) => <tr key={method}><td className="p-3 font-bold text-white">{paymentLabels[method] || method}</td><td className="p-3 text-left text-emerald-300" dir="ltr">{formatMoney(item.income)} {t.currency}</td><td className="p-3 text-left text-rose-300" dir="ltr">{formatMoney(item.expenses)} {t.currency}</td><td className={`p-3 text-left font-bold ${Number(item.net) >= 0 ? 'text-cyan-300' : 'text-rose-300'}`} dir="ltr">{formatMoney(item.net)} {t.currency}</td><td className="p-3 text-left text-slate-300">{item.count || 0}</td></tr>)}</tbody>
+                </table>
+              </div>
+              <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm"><div className="flex justify-between"><span className="text-slate-300">الصافي المرحّل للخزنة</span><b className="text-emerald-300" dir="ltr">{formatMoney(closingReceipt.finance.net_income)} {t.currency}</b></div></div>
+            </div>
+            <div className="flex justify-end border-t border-border bg-surface/80 px-5 py-3"><button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white"><Printer className="h-4 w-4" /> طباعة التقفيلة</button></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
