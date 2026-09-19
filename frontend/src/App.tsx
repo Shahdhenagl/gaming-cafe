@@ -110,9 +110,13 @@ export function App() {
   }, []);
 
   const refreshOperationalData = useCallback(async () => {
-    const [devRes, tableRes] = await Promise.all([api.getDevices(), api.getTables()]);
-    if (devRes?.devices) setDevices(devRes.devices);
-    if (tableRes?.tables) setTables(tableRes.tables);
+    try {
+      const [devRes, tableRes] = await Promise.all([api.getDevices(), api.getTables()]);
+      if (devRes?.devices) setDevices(devRes.devices);
+      if (tableRes?.tables) setTables(tableRes.tables);
+    } catch {
+      // Keep the last known state; an action should not be blocked by a refresh.
+    }
   }, []);
 
   useEffect(() => {
@@ -131,7 +135,7 @@ export function App() {
       } catch (e) {
         // quiet polling error
       }
-    }, 10000);
+    }, 30000);
 
     const secondaryInterval = setInterval(async () => {
       try {
@@ -174,12 +178,12 @@ export function App() {
     data: { duration_minutes?: number; is_open_ended?: boolean; customer_name?: string; customer_phone?: string; discount?: number }
   ) => {
     await api.startSession(deviceId, data);
-    await refreshOperationalData();
+    void refreshOperationalData();
   };
 
   const handleExtendGamingSession = async (sessionId: number, addedMinutes: number) => {
     await api.extendSession(sessionId, addedMinutes);
-    await refreshOperationalData();
+    void refreshOperationalData();
   };
 
   const handleAddBeverageToSession = async (
@@ -187,7 +191,7 @@ export function App() {
     items: { product_id: number; quantity: number }[]
   ) => {
     await api.addBeverageToSession(sessionId, items);
-    await refreshOperationalData();
+    void refreshOperationalData();
   };
 
   const handleEndGamingSession = async (
@@ -195,7 +199,7 @@ export function App() {
     data: { payment_method: string; discount?: number; amount_paid?: number }
   ) => {
     const res = await api.endSession(sessionId, data);
-    await refreshOperationalData();
+    void refreshOperationalData();
     if (res && res.receipt) {
       setReceiptModalData(res.receipt);
     }
@@ -203,7 +207,7 @@ export function App() {
 
   const handlePosCheckout = async (data: any) => {
     const res = await api.createOrder(data);
-    await refreshOperationalData();
+    void refreshOperationalData();
 
     // Fetch thermal receipt for order
     let receipt: ThermalReceipt | undefined;
@@ -219,17 +223,17 @@ export function App() {
 
   const handleOccupyTable = async (tableId: number) => {
     await api.occupyTable(tableId);
-    await refreshOperationalData();
+    void refreshOperationalData();
   };
 
   const handleMoveTableToGaming = async (tableId: number, deviceSessionId: number) => {
     await api.moveTableToGaming(tableId, deviceSessionId);
-    await refreshOperationalData();
+    void refreshOperationalData();
   };
 
   const handleReleaseTable = async (tableId: number, paymentMethod: string) => {
     await api.releaseTable(tableId, paymentMethod);
-    await refreshOperationalData();
+    void refreshOperationalData();
   };
 
   const handleMarkNotifRead = async (id: number) => {
