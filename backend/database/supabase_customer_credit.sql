@@ -53,6 +53,19 @@ CREATE TABLE IF NOT EXISTS public.customer_debt_payments (
 CREATE INDEX IF NOT EXISTS customer_debt_payments_debt_index
   ON public.customer_debt_payments (customer_debt_id);
 
+-- تحصيل الدين يدخل في الشيفت الحالي والخزنة الحالية.
+ALTER TABLE public.payments
+  ADD COLUMN IF NOT EXISTS shift_id bigint NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payments_shift_id_foreign') THEN
+    ALTER TABLE public.payments
+      ADD CONSTRAINT payments_shift_id_foreign
+      FOREIGN KEY (shift_id) REFERENCES public.shifts(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
 -- Optional: keep updated_at current when records change.
 CREATE OR REPLACE FUNCTION public.set_customer_credit_updated_at()
 RETURNS trigger LANGUAGE plpgsql AS $$

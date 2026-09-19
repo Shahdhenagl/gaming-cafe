@@ -68,7 +68,8 @@ class FinanceController extends Controller
             ->latest();
         if ($shiftId) {
             $query->where(function ($q) use ($shiftId) {
-                $q->whereHas('order', fn ($order) => $order->where('shift_id', $shiftId))
+                $q->where('shift_id', $shiftId)
+                    ->orWhereHas('order', fn ($order) => $order->where('shift_id', $shiftId))
                     ->orWhereHas('deviceSession', fn ($session) => $session->where('shift_id', $shiftId));
             });
         }

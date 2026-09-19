@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\CustomerDebt;
 use App\Models\CustomerDebtPayment;
 use App\Models\Payment;
+use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -46,6 +47,7 @@ class CustomerDebtController extends Controller
             return response()->json(['message' => 'مبلغ السداد أكبر من المتبقي'], 422);
         }
         DB::transaction(function () use ($debt, $validated, $request) {
+            $activeShift = Shift::where('status', 'active')->latest()->first();
             CustomerDebtPayment::create([
                 'customer_debt_id' => $debt->id,
                 'amount' => $validated['amount'],
@@ -56,6 +58,7 @@ class CustomerDebtController extends Controller
             Payment::create([
                 'order_id' => $debt->order_id,
                 'device_session_id' => $debt->device_session_id,
+                'shift_id' => $activeShift?->id,
                 'amount' => $validated['amount'],
                 'payment_method' => $validated['payment_method'],
                 'status' => 'confirmed',
