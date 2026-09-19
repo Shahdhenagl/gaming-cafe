@@ -227,7 +227,31 @@ export function App() {
       const recRes = await api.getOrderReceipt(res.order.id);
       receipt = recRes.receipt;
     } catch {
-      // ignore
+      // A saved credit order must still be printable if the receipt request fails.
+      receipt = {
+        business_name: 'AL5AL Gaming & Billiards Lounge',
+        business_name_ar: 'صالة الخال للألعاب والبلياردو والكافيه',
+        order_number: res.order.order_number,
+        date_time: new Date().toLocaleString('ar-EG'),
+        staff_name: user?.name || 'Cashier',
+        order_type: res.order.order_type,
+        items: (res.order.items || []).map((item: any) => ({
+          name: item.product?.name || 'Item',
+          name_ar: item.product?.name_ar || item.product?.name || 'صنف',
+          quantity: item.quantity,
+          unit_price: Number(item.unit_price),
+          subtotal: Number(item.subtotal),
+        })),
+        subtotal: Number(res.order.subtotal),
+        discount: Number(res.order.discount),
+        tax: Number(res.order.tax),
+        total_amount: Number(res.order.total_amount),
+        payment_method: res.order.payment_method || data.payment_method,
+        payment_status: res.order.payment_status || 'unpaid',
+        notes: res.order.notes,
+        footer_note: 'Thank you for playing and drinking with us! Game On!',
+        footer_note_ar: 'شكراً لزيارتكم ونتمنى لكم وقتاً ممتعاً!',
+      };
     }
 
     return { order: res.order, receipt };

@@ -70,6 +70,7 @@ export const PosBar: React.FC<PosBarProps> = ({
   const [cashTendered, setCashTendered] = useState<string>('');
   const [creditCustomerName, setCreditCustomerName] = useState('');
   const [creditCustomerPhone, setCreditCustomerPhone] = useState('');
+  const [checkoutError, setCheckoutError] = useState('');
   const [loading, setLoading] = useState<boolean>(false);
 
   // Categories list
@@ -152,11 +153,17 @@ export const PosBar: React.FC<PosBarProps> = ({
   const handleOpenCheckout = () => {
     if (cartItems.length === 0) return;
     setCashTendered(total.toString());
+    setCheckoutError('');
     setShowCheckoutModal(true);
   };
 
   const handleCompleteOrder = async () => {
+    if (paymentMethod === 'credit' && (!creditCustomerName.trim() || !creditCustomerPhone.trim())) {
+      setCheckoutError('اكتب اسم العميل ورقم الهاتف قبل تأكيد الفاتورة الآجلة.');
+      return;
+    }
     setLoading(true);
+    setCheckoutError('');
     try {
       const res = await onCheckout({
         order_type: orderType,
@@ -183,6 +190,8 @@ export const PosBar: React.FC<PosBarProps> = ({
       if (res && res.receipt) {
         onShowReceipt(res.receipt);
       }
+    } catch (error: any) {
+      setCheckoutError(error?.message || 'تعذر حفظ الفاتورة. حاول مرة أخرى.');
     } finally {
       setLoading(false);
     }
@@ -577,6 +586,8 @@ export const PosBar: React.FC<PosBarProps> = ({
                   <input value={creditCustomerPhone} onChange={(e) => setCreditCustomerPhone(e.target.value)} required placeholder="رقم الهاتف" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
                 </div>
               )}
+
+              {checkoutError && <div className="rounded-xl border border-rose-500/50 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300">{checkoutError}</div>}
 
               {/* Order Notes */}
               <div>
