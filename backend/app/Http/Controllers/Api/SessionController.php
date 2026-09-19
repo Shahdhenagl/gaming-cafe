@@ -298,6 +298,17 @@ class SessionController extends Controller
             ]);
         });
 
+        $receiptItems = $session->orders
+            ->flatMap(fn ($order) => $order->items ?? collect())
+            ->map(fn ($item) => [
+                'name' => $item->product?->name ?? 'Item',
+                'name_ar' => $item->product?->name_ar ?? $item->product?->name ?? 'صنف',
+                'quantity' => (int) $item->quantity,
+                'unit_price' => (float) $item->unit_price,
+                'subtotal' => (float) $item->subtotal,
+            ])->values()->all();
+        $firstOrder = $session->orders->first();
+
         return response()->json([
             'message' => 'Gaming session ended and settled successfully',
             'receipt' => [
@@ -306,6 +317,10 @@ class SessionController extends Controller
                 'slogan' => 'Enjoy The Game - استمتع بأفضل تجربة لعب وتحدي',
                 'phones' => '01032890430 (Karim) / 01289535503 (Al-Ghareeb) / 0502943796',
                 'session_id' => $session->id,
+                'order_number' => $firstOrder?->order_number ?? ('SESSION-' . $session->id),
+                'date_time' => Carbon::now()->format('Y-m-d H:i'),
+                'staff_name' => $request->user()?->name ?? 'كاشير الصالة',
+                'order_type' => 'gaming_room',
                 'device_name' => $session->device->device_name,
                 'room_name' => $session->device->room_name,
                 'customer_name' => $session->customer_name,
@@ -317,6 +332,12 @@ class SessionController extends Controller
                 'discount' => (float)$discount,
                 'total_amount' => (float)$finalTotal,
                 'payment_method' => $paymentMethod,
+                'payment_status' => 'paid',
+                'subtotal' => (float) ($sessionCost + $session->beverage_cost),
+                'tax' => 0,
+                'items' => $receiptItems,
+                'footer_note' => 'Thank you for visiting AL5AL! Enjoy The Game',
+                'footer_note_ar' => 'شكراً لزيارتكم صالة الخال! استمتعوا باللعب',
                 'orders' => $session->orders,
             ]
         ]);

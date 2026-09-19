@@ -201,7 +201,17 @@ export function App() {
     const res = await api.endSession(sessionId, data);
     void refreshOperationalData();
     if (res && res.receipt) {
-      setReceiptModalData(res.receipt);
+      const rawReceipt = res.receipt as ThermalReceipt & { orders?: Order[] };
+      const items = Array.isArray(rawReceipt.items)
+        ? rawReceipt.items
+        : (rawReceipt.orders || []).flatMap((order) => (order.items || []).map((item) => ({
+            name: item.product?.name || 'Item',
+            name_ar: item.product?.name_ar || item.product?.name || 'صنف',
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            subtotal: item.subtotal,
+          })));
+      setReceiptModalData({ ...rawReceipt, items });
     }
   };
 
