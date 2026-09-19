@@ -120,7 +120,7 @@ export interface OrderItem {
 
 export type OrderType = 'take_away' | 'dine_in' | 'gaming_room';
 export type OrderStatus = 'pending' | 'completed' | 'cancelled';
-export type PaymentMethod = 'cash' | 'visa' | 'wallet' | 'instapay' | 'installment' | 'other';
+export type PaymentMethod = 'cash' | 'visa' | 'wallet' | 'instapay' | 'installment' | 'credit' | 'other';
 
 export interface Order {
   id: number;
@@ -143,6 +143,7 @@ export interface Order {
   table?: Table;
   device_session?: ActiveSessionData;
   staff?: User;
+  customer?: { id: number; name: string; phone: string };
 }
 
 export interface Table {

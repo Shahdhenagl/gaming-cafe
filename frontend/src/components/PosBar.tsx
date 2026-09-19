@@ -35,6 +35,8 @@ interface PosBarProps {
     tax?: number;
     payment_method?: PaymentMethod;
     payment_status?: string;
+    customer_name?: string;
+    customer_phone?: string;
     notes?: string;
   }) => Promise<{ order: Order; receipt?: ThermalReceipt }>;
   onShowReceipt: (receipt: ThermalReceipt) => void;
@@ -66,6 +68,8 @@ export const PosBar: React.FC<PosBarProps> = ({
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [cashTendered, setCashTendered] = useState<string>('');
+  const [creditCustomerName, setCreditCustomerName] = useState('');
+  const [creditCustomerPhone, setCreditCustomerPhone] = useState('');
   const [loading, setLoading] = useState<boolean>(false);
 
   // Categories list
@@ -166,6 +170,8 @@ export const PosBar: React.FC<PosBarProps> = ({
         tax: taxVal,
         payment_method: paymentMethod,
         payment_status: orderType === 'take_away' ? 'paid' : 'paid',
+        customer_name: paymentMethod === 'credit' ? creditCustomerName.trim() : undefined,
+        customer_phone: paymentMethod === 'credit' ? creditCustomerPhone.trim() : undefined,
         notes: orderNotes.trim() || undefined,
       });
 
@@ -505,6 +511,7 @@ export const PosBar: React.FC<PosBarProps> = ({
                     { id: 'visa', label: t.visa },
                     { id: 'wallet', label: t.wallet },
                     { id: 'instapay', label: t.instapay },
+                    { id: 'credit', label: 'آجل' },
                   ].map((m) => (
                     <button
                       key={m.id}
@@ -560,6 +567,14 @@ export const PosBar: React.FC<PosBarProps> = ({
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {paymentMethod === 'credit' && (
+                <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+                  <p className="text-xs font-bold text-amber-300">بيانات العميل الآجل مطلوبة</p>
+                  <input value={creditCustomerName} onChange={(e) => setCreditCustomerName(e.target.value)} required placeholder="اسم العميل" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
+                  <input value={creditCustomerPhone} onChange={(e) => setCreditCustomerPhone(e.target.value)} required placeholder="رقم الهاتف" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
                 </div>
               )}
 

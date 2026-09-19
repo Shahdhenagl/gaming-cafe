@@ -13,6 +13,7 @@ class Order extends Model
         'order_number',
         'shift_id',
         'staff_id',
+        'customer_id',
         'status',
         'order_type',
         'table_id',
@@ -46,6 +47,11 @@ class Order extends Model
     public function staff()
     {
         return $this->belongsTo(User::class, 'staff_id');
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'customer_id');
     }
 
     public function table()

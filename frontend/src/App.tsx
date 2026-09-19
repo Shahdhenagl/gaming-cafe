@@ -6,6 +6,7 @@ import {
   Clock, 
   Package, 
   BarChart3,
+  CreditCard,
   RefreshCw
 } from 'lucide-react';
 import { Device, NotificationItem, Order, Product, Shift, ShiftMetrics, Table, ThermalReceipt, User } from './types';
@@ -23,6 +24,7 @@ import { StartShiftModal } from './components/StartShiftModal';
 import { EndShiftModal } from './components/EndShiftModal';
 import { LoginModal } from './components/LoginModal';
 import { ThermalReceiptModal } from './components/ThermalReceiptModal';
+import { CustomerDebts } from './components/CustomerDebts';
 
 export function App() {
   // Localization: 'en' (LTR) vs 'ar' (RTL)
@@ -34,7 +36,7 @@ export function App() {
   const t = translations[lang];
 
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState<'gaming' | 'pos' | 'tables' | 'shift' | 'inventory' | 'analytics' | 'management'>('gaming');
+  const [activeTab, setActiveTab] = useState<'gaming' | 'pos' | 'tables' | 'shift' | 'inventory' | 'analytics' | 'management' | 'debts'>('gaming');
 
   // Core system data
   const [user, setUser] = useState<User | null>(null);
@@ -196,7 +198,7 @@ export function App() {
 
   const handleEndGamingSession = async (
     sessionId: number,
-    data: { payment_method: string; discount?: number; amount_paid?: number }
+    data: { payment_method: string; discount?: number; amount_paid?: number; customer_name?: string; customer_phone?: string }
   ) => {
     const res = await api.endSession(sessionId, data);
     void refreshOperationalData();
@@ -268,6 +270,7 @@ export function App() {
     { id: 'inventory', label: t.navInventory, icon: Package },
     { id: 'analytics', label: t.navAnalytics, icon: BarChart3 },
     { id: 'management', label: lang === 'ar' ? 'لوحة التحكم' : 'Management', icon: Users },
+    { id: 'debts', label: lang === 'ar' ? 'آجل العملاء' : 'Customer Debts', icon: CreditCard },
   ];
 
   return (
@@ -387,6 +390,7 @@ export function App() {
             {activeTab === 'management' && (
               <ManagementDashboard lang={lang} products={products} devices={devices} user={user} onRefresh={loadInitialData} />
             )}
+            {activeTab === 'debts' && <CustomerDebts />}
           </div>
         )}
       </main>

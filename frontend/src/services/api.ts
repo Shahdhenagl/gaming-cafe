@@ -231,7 +231,7 @@ class ApiService {
     }
   }
 
-  async endSession(sessionId: number, data: { payment_method: string; discount?: number; amount_paid?: number }) {
+  async endSession(sessionId: number, data: { payment_method: string; discount?: number; amount_paid?: number; customer_name?: string; customer_phone?: string }) {
     if (isStandalone) return mockStore.endSession(sessionId, data);
     try {
       return await this.request<{ message: string; receipt: ThermalReceipt }>(`/sessions/${sessionId}/end`, { method: 'POST', body: JSON.stringify(data) });
@@ -262,6 +262,8 @@ class ApiService {
     tax?: number;
     payment_method?: string;
     payment_status?: string;
+    customer_name?: string;
+    customer_phone?: string;
     notes?: string;
   }): Promise<{ message: string; order: Order }> {
     if (isStandalone) return mockStore.createOrder(data);
@@ -334,6 +336,15 @@ class ApiService {
         },
       };
     }
+  }
+
+  async getCustomerDebts(search = '') {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return this.request<{ customers: Array<{ id: number; name: string; phone: string; total_debt: number; total_paid: number; remaining_debt: number; debts: any[] }> }>(`/customer-debts${query}`);
+  }
+
+  async payCustomerDebt(debtId: number, data: { amount: number; payment_method: string; notes?: string }) {
+    return this.request(`/customer-debts/${debtId}/pay`, { method: 'POST', body: JSON.stringify(data) });
   }
 
   // --- Tables ---

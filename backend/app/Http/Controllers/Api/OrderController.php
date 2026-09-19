@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DeviceSession;
+use App\Models\Customer;
+use App\Models\CustomerDebt;
 use App\Models\InventoryLog;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -57,8 +59,10 @@ class OrderController extends Controller
             'items.*.notes' => 'nullable|string',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|in:cash,visa,wallet,instapay,installment,other',
+            'payment_method' => 'nullable|in:cash,visa,wallet,instapay,installment,credit,other',
             'payment_status' => 'nullable|in:unpaid,paid',
+            'customer_name' => 'required_if:payment_method,credit|string|max:255',
+            'customer_phone' => 'required_if:payment_method,credit|string|max:40',
             'notes' => 'nullable|string',
         ]);
 
@@ -97,13 +101,17 @@ class OrderController extends Controller
             $tax = 0.00;
             $totalAmount = max(0, $subtotal - $discount);
 
-            $paymentStatus = $request->order_type === 'take_away' ? 'paid' : ($request->payment_status ?? 'unpaid');
             $paymentMethod = $request->payment_method ?? 'cash';
+            $paymentStatus = $paymentMethod === 'credit' ? 'unpaid' : ($request->order_type === 'take_away' ? 'paid' : ($request->payment_status ?? 'unpaid'));
+            $customer = $paymentMethod === 'credit'
+                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name])
+                : null;
 
             $order = Order::create([
                 'order_number' => 'ORD-' . strtoupper(bin2hex(random_bytes(3))),
                 'shift_id' => $shift ? $shift->id : null,
                 'staff_id' => $request->user() ? $request->user()->id : null,
+                'customer_id' => $customer?->id,
                 'status' => 'completed',
                 'order_type' => $request->order_type,
                 'table_id' => $request->table_id,
@@ -164,6 +172,16 @@ class OrderController extends Controller
                 ]);
             }
 
+            if ($paymentMethod === 'credit' && $customer) {
+                CustomerDebt::create([
+                    'customer_id' => $customer->id,
+                    'order_id' => $order->id,
+                    'shift_id' => $shift?->id,
+                    'amount' => $totalAmount,
+                    'description' => 'فاتورة ' . $order->order_number,
+                ]);
+            }
+
             return $order;
         });
 
@@ -181,24 +199,30 @@ class OrderController extends Controller
         $order = Order::with('table')->findOrFail($id);
 
         $request->validate([
-            'payment_method' => 'required|in:cash,visa,wallet,instapay,installment,other',
+            'payment_method' => 'required|in:cash,visa,wallet,instapay,installment,credit,other',
             'amount' => 'nullable|numeric|min:0',
+            'customer_name' => 'required_if:payment_method,credit|string|max:255',
+            'customer_phone' => 'required_if:payment_method,credit|string|max:40',
         ]);
 
         $amount = $request->amount ?? $order->total_amount;
 
         DB::transaction(function () use ($order, $request, $amount) {
+            $customer = null;
+            if ($request->payment_method === 'credit') {
+                $customer = Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name]);
+                $order->update(['customer_id' => $customer->id]);
+            }
             $order->update([
-                'payment_status' => 'paid',
+                'payment_status' => $request->payment_method === 'credit' ? 'unpaid' : 'paid',
                 'payment_method' => $request->payment_method,
             ]);
 
-            Payment::create([
-                'order_id' => $order->id,
-                'amount' => $amount,
-                'payment_method' => $request->payment_method,
-                'status' => 'confirmed',
-            ]);
+            if ($request->payment_method === 'credit') {
+                CustomerDebt::create(['customer_id' => $customer->id, 'order_id' => $order->id, 'shift_id' => $order->shift_id, 'amount' => $amount, 'description' => 'فاتورة ' . $order->order_number]);
+            } else {
+                Payment::create(['order_id' => $order->id, 'amount' => $amount, 'payment_method' => $request->payment_method, 'status' => 'confirmed']);
+            }
 
             // If dine-in, free table
             if ($order->table) {

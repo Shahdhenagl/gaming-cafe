@@ -29,7 +29,7 @@ interface GamingRoomProps {
   onStartSession: (deviceId: number, data: { duration_minutes?: number; is_open_ended?: boolean; customer_name?: string; customer_phone?: string; discount?: number }) => Promise<void>;
   onExtendSession: (sessionId: number, addedMinutes: number) => Promise<void>;
   onAddBeverageToSession: (sessionId: number, items: { product_id: number; quantity: number }[]) => Promise<void>;
-  onEndSession: (sessionId: number, data: { payment_method: string; discount?: number; amount_paid?: number }) => Promise<ThermalReceipt | void>;
+  onEndSession: (sessionId: number, data: { payment_method: string; discount?: number; amount_paid?: number; customer_name?: string; customer_phone?: string }) => Promise<ThermalReceipt | void>;
   onRefresh: () => void;
 }
 
@@ -67,6 +67,8 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
 
   const [selectedDrinks, setSelectedDrinks] = useState<{ [productId: number]: number }>({});
   const [endPaymentMethod, setEndPaymentMethod] = useState<string>('cash');
+  const [endCustomerName, setEndCustomerName] = useState('');
+  const [endCustomerPhone, setEndCustomerPhone] = useState('');
   const [endDiscount, setEndDiscount] = useState<string>('0');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string>('');
@@ -231,10 +233,14 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
       await onEndSession(endModalDevice.active_session.id, {
         payment_method: endPaymentMethod,
         discount: parseFloat(endDiscount) || 0,
+        customer_name: endPaymentMethod === 'credit' ? endCustomerName.trim() : undefined,
+        customer_phone: endPaymentMethod === 'credit' ? endCustomerPhone.trim() : undefined,
       });
       sounds.playCashRegister();
       setEndModalDevice(null);
       setEndDiscount('0');
+      setEndCustomerName('');
+      setEndCustomerPhone('');
     } finally {
       setActionLoading(false);
     }
@@ -874,6 +880,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                     { id: 'visa', label: t.visa },
                     { id: 'wallet', label: t.wallet },
                     { id: 'instapay', label: t.instapay },
+                    { id: 'credit', label: 'آجل' },
                   ].map((m) => (
                     <button
                       key={m.id}
@@ -890,6 +897,14 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                   ))}
                 </div>
               </div>
+
+              {endPaymentMethod === 'credit' && (
+                <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+                  <p className="text-xs font-bold text-amber-300">بيانات العميل الآجل مطلوبة</p>
+                  <input value={endCustomerName} onChange={(e) => setEndCustomerName(e.target.value)} required placeholder="اسم العميل" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
+                  <input value={endCustomerPhone} onChange={(e) => setEndCustomerPhone(e.target.value)} required placeholder="رقم الهاتف" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
                 <button

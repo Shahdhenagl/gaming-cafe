@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\CustomerDebtController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FinanceController;
 use App\Http\Controllers\Api\NotificationController;
@@ -84,6 +85,9 @@ $apiRoutes = function () {
         Route::delete('/expenses/{id}', [ExpenseController::class, 'destroy']);
         Route::get('/finance/summary', [FinanceController::class, 'summary']);
         Route::get('/finance/transactions', [FinanceController::class, 'transactions']);
+        Route::get('/customer-debts', [CustomerDebtController::class, 'index']);
+        Route::get('/customer-debts/{id}', [CustomerDebtController::class, 'show']);
+        Route::post('/customer-debts/{debtId}/pay', [CustomerDebtController::class, 'pay']);
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
         Route::patch('/users/{id}', [UserController::class, 'update']);

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\DeviceSession;
+use App\Models\Customer;
+use App\Models\CustomerDebt;
 use App\Models\InventoryLog;
 use App\Models\Notification;
 use App\Models\Order;
@@ -251,9 +253,11 @@ class SessionController extends Controller
         $session = DeviceSession::with(['device', 'orders.items.product'])->findOrFail($id);
 
         $request->validate([
-            'payment_method' => 'required|in:cash,visa,wallet,instapay,installment,other',
+            'payment_method' => 'required|in:cash,visa,wallet,instapay,installment,credit,other',
             'discount' => 'nullable|numeric|min:0',
             'amount_paid' => 'nullable|numeric|min:0',
+            'customer_name' => 'required_if:payment_method,credit|string|max:255',
+            'customer_phone' => 'required_if:payment_method,credit|string|max:40',
         ]);
 
         $paymentMethod = $request->payment_method;
@@ -267,7 +271,10 @@ class SessionController extends Controller
         $finalTotal = max(0, $sessionCost + $session->beverage_cost - $discount);
         $amountPaid = $request->filled('amount_paid') ? (float)$request->amount_paid : $finalTotal;
 
-        DB::transaction(function () use ($session, $paymentMethod, $discount, $finalTotal, $amountPaid, $elapsedMinutes, $sessionCost) {
+        DB::transaction(function () use ($session, $paymentMethod, $discount, $finalTotal, $amountPaid, $elapsedMinutes, $sessionCost, $request) {
+            $customer = $paymentMethod === 'credit'
+                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name])
+                : null;
             $session->update([
                 'status' => 'ended',
                 'end_time' => Carbon::now(),
@@ -275,8 +282,8 @@ class SessionController extends Controller
                 'session_cost' => $sessionCost,
                 'discount' => $discount,
                 'total_amount' => $finalTotal,
-                'paid_amount' => $amountPaid,
-                'payment_status' => 'paid',
+                'paid_amount' => $paymentMethod === 'credit' ? 0 : $amountPaid,
+                'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
                 'payment_method' => $paymentMethod,
             ]);
 
@@ -285,17 +292,16 @@ class SessionController extends Controller
 
             // Update associated orders to paid
             $session->orders()->update([
-                'payment_status' => 'paid',
+                'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
                 'payment_method' => $paymentMethod,
+                ...($customer ? ['customer_id' => $customer->id] : []),
             ]);
 
-            // Record Payment
-            Payment::create([
-                'device_session_id' => $session->id,
-                'amount' => $amountPaid,
-                'payment_method' => $paymentMethod,
-                'status' => 'confirmed',
-            ]);
+            if ($paymentMethod === 'credit' && $customer) {
+                CustomerDebt::create(['customer_id' => $customer->id, 'device_session_id' => $session->id, 'shift_id' => $session->shift_id, 'amount' => $finalTotal, 'description' => 'جلسة ألعاب ' . $session->device->device_name]);
+            } else {
+                Payment::create(['device_session_id' => $session->id, 'amount' => $amountPaid, 'payment_method' => $paymentMethod, 'status' => 'confirmed']);
+            }
         });
 
         $receiptItems = $session->orders
@@ -332,7 +338,7 @@ class SessionController extends Controller
                 'discount' => (float)$discount,
                 'total_amount' => (float)$finalTotal,
                 'payment_method' => $paymentMethod,
-                'payment_status' => 'paid',
+                'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
                 'subtotal' => (float) ($sessionCost + $session->beverage_cost),
                 'tax' => 0,
                 'items' => $receiptItems,
