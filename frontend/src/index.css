@@ -71,9 +71,19 @@ html.light ::-webkit-scrollbar-thumb { background: #b8c4d6; }
 /* Thermal Receipt Print Stylesheet */
 @media print {
   @page { size: 80mm auto; margin: 0; }
-  html, body { width: 80mm; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  html, body { width: 80mm !important; min-width: 80mm !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow: visible !important; }
   body * { visibility: hidden; }
   #thermal-receipt, #thermal-receipt * { visibility: visible; }
-  #thermal-receipt { position: absolute; left: 0; top: 0; width: 80mm !important; max-width: 80mm !important; box-sizing: border-box; margin: 0 !important; padding: 3mm !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; color: #000 !important; font-family: monospace !important; font-size: 11px !important; line-height: 1.25 !important; overflow: visible !important; }
+  #thermal-receipt { position: absolute; left: 0; top: 0; width: 80mm !important; max-width: 80mm !important; min-width: 80mm !important; box-sizing: border-box; margin: 0 !important; padding: 2.5mm !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; color: #000 !important; font-family: Arial, 'Tajawal', sans-serif !important; font-size: 10px !important; line-height: 1.25 !important; overflow: visible !important; overflow-wrap: anywhere; }
+  #thermal-receipt * { box-sizing: border-box; max-width: 100%; }
+  #thermal-receipt .text-xl { font-size: 16px !important; }
+  #thermal-receipt .text-base { font-size: 13px !important; }
+  #thermal-receipt .text-sm { font-size: 11px !important; }
+  #thermal-receipt .text-xs { font-size: 10px !important; }
+  #thermal-receipt .text-\[11px\] { font-size: 10px !important; }
+  #thermal-receipt .text-\[10px\] { font-size: 9px !important; }
+  #thermal-receipt .text-\[9px\] { font-size: 8px !important; }
+  #thermal-receipt .text-\[8px\] { font-size: 7px !important; }
+  #thermal-receipt .tracking-\[6px\] { letter-spacing: 3px !important; }
   .no-print { display: none !important; }
 }
