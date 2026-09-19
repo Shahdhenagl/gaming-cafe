@@ -31,7 +31,6 @@ class ShiftController extends Controller
             } else {
                 $shift = $query->where('status', 'active')->latest()->first();
             }
-            if (!$shift) $shift = Shift::with('staff')->latest()->first();
         } catch (\Throwable $e) {
             report($e);
             return response()->json(['active' => false, 'shift' => null, 'metrics' => null, 'degraded' => true]);
@@ -41,6 +40,27 @@ class ShiftController extends Controller
             return response()->json([
                 'active' => false,
                 'shift' => null,
+                'metrics' => [
+                    'elapsed_time_formatted' => '00:00:00',
+                    'elapsed_minutes' => 0,
+                    'total_orders' => 0,
+                    'total_sessions' => 0,
+                    'active_sessions_count' => 0,
+                    'total_beverages_sold' => 0,
+                    'total_revenue' => 0,
+                    'cash_collected' => 0,
+                    'cash_revenue' => 0,
+                    'cash_expenses' => 0,
+                    'expenses_total' => 0,
+                    'gaming_revenue' => 0,
+                    'gaming_profit' => 0,
+                    'beverage_revenue' => 0,
+                    'beverage_cost' => 0,
+                    'beverage_profit' => 0,
+                    'net_profit' => 0,
+                    'card_collected' => 0,
+                    'average_order_value' => 0,
+                ],
             ]);
         }
 
