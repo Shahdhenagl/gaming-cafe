@@ -5,9 +5,7 @@ import {
   Gamepad2, 
   DollarSign, 
   ArrowRightLeft, 
-  CheckCircle, 
   Coffee, 
-  Sparkles,
   Plus,
   Receipt,
   Search,
@@ -107,7 +105,7 @@ export const TableManagement: React.FC<TableManagementProps> = ({
   const handleAddDrinksSubmit = async () => {
     if (!drinkModalTable) return;
     const itemsToAdd = Object.entries(selectedDrinks)
-      .filter(([_, qty]) => qty > 0)
+      .filter(([, qty]) => qty > 0)
       .map(([id, qty]) => ({ product_id: Number(id), quantity: qty }));
 
     if (itemsToAdd.length === 0) return;

@@ -48,19 +48,6 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [expenseDraft, setExpenseDraft] = useState({ category: 'general', description: '', amount: '', payment_method: 'cash', expense_date: new Date().toISOString().slice(0, 10) });
 
-  useEffect(() => {
-    fetchHistory();
-    api.getExpenses(30).then(res => setExpenses(res.expenses || [])).catch(() => undefined);
-    api.getAnalytics('day').then(res => setTodayReport(res.summary || null)).catch(() => undefined);
-  }, [shift?.id]);
-
-  useEffect(() => {
-    api.getFinanceSummary(shift?.id).then(setFinance).catch(() => setFinance(null));
-  }, [shift?.id, shift?.status]);
-
-  const today = new Date().toISOString().slice(0, 10);
-  const visibleExpenses = expenseFilter === 'today' ? expenses.filter(exp => String(exp.expense_date).slice(0, 10) === today) : expenses;
-
   const fetchHistory = async () => {
     setLoadingHistory(true);
     try {
@@ -72,6 +59,19 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
       setLoadingHistory(false);
     }
   };
+
+  useEffect(() => {
+    void fetchHistory();
+    api.getExpenses(30).then(res => setExpenses(res.expenses || [])).catch(() => undefined);
+    api.getAnalytics('day').then(res => setTodayReport(res.summary || null)).catch(() => undefined);
+  }, [shift?.id]);
+
+  useEffect(() => {
+    api.getFinanceSummary(shift?.id).then(setFinance).catch(() => setFinance(null));
+  }, [shift?.id, shift?.status]);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const visibleExpenses = expenseFilter === 'today' ? expenses.filter(exp => String(exp.expense_date).slice(0, 10) === today) : expenses;
 
   const handleExpenseSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
