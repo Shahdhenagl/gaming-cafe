@@ -104,6 +104,7 @@ $apiRoutes = function () {
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
         Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
         Route::get('/reports/analytics', [ReportController::class, 'analytics']);
+        Route::get('/reports/statement', [ReportController::class, 'statement']);
     });
 };
 

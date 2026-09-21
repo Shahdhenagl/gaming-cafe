@@ -220,3 +220,48 @@ export interface ThermalReceipt {
   footer_note: string;
   footer_note_ar: string;
 }
+
+export interface StatementTransaction {
+  id: string;
+  type: 'gaming' | 'cafe' | 'expense' | 'debt_payment';
+  type_label: string;
+  reference: string;
+  title: string;
+  customer_name?: string | null;
+  device_or_table?: string | null;
+  duration?: string | null;
+  details?: string | null;
+  items_summary?: string | null;
+  staff_name?: string | null;
+  payment_method: string;
+  payment_method_label: string;
+  amount_in: number;
+  amount_out: number;
+  net_amount: number;
+  created_at: string;
+  date_time: string;
+  status: string;
+}
+
+export interface StatementSummary {
+  total_income: number;
+  total_expenses: number;
+  net_income: number;
+  cash_in: number;
+  cash_out: number;
+  net_cash: number;
+  gaming_income: number;
+  cafe_income: number;
+  transactions_count: number;
+}
+
+export interface StatementResponse {
+  period: {
+    type: string;
+    label: string;
+    from: string;
+    to: string;
+  };
+  summary: StatementSummary;
+  transactions: StatementTransaction[];
+}

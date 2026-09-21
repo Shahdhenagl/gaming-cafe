@@ -73,8 +73,10 @@ html.light ::-webkit-scrollbar-thumb { background: #b8c4d6; }
   @page { size: 80mm auto; margin: 0; }
   html, body { width: 80mm !important; min-width: 80mm !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow: visible !important; }
   body * { visibility: hidden; }
-  #thermal-receipt, #thermal-receipt * { visibility: visible; }
+  #thermal-receipt, #thermal-receipt *,
+  #statement-print-sheet, #statement-print-sheet * { visibility: visible; }
   #thermal-receipt { position: absolute; left: 0; top: 0; width: 80mm !important; max-width: 80mm !important; min-width: 80mm !important; box-sizing: border-box; margin: 0 !important; padding: 2.5mm !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; color: #000 !important; font-family: Arial, 'Tajawal', sans-serif !important; font-size: 10px !important; line-height: 1.25 !important; overflow: visible !important; overflow-wrap: anywhere; }
+  #statement-print-sheet { position: absolute; left: 0; top: 0; width: 100% !important; max-width: 100% !important; box-sizing: border-box; margin: 0 !important; padding: 10mm !important; border: 0 !important; box-shadow: none !important; background: #fff !important; color: #000 !important; font-family: Arial, 'Tajawal', sans-serif !important; font-size: 12px !important; }
   #thermal-receipt * { box-sizing: border-box; max-width: 100%; }
   #thermal-receipt .text-xl { font-size: 16px !important; }
   #thermal-receipt .text-base { font-size: 13px !important; }

@@ -5,6 +5,9 @@ import {
   Product,
   Shift,
   ShiftMetrics,
+  StatementResponse,
+  StatementSummary,
+  StatementTransaction,
   Table,
   ThermalReceipt,
   User,
@@ -1132,6 +1135,161 @@ class MockStore {
         { category: 'soft_drinks', label: 'مشروبات طاقة وغازية', amount: 420, percentage: 15 },
         { category: 'snacks', label: 'سناكس وتسالي', amount: 280, percentage: 10 },
       ],
+    };
+  }
+
+  getStatement(params?: { date?: string; month?: string; from_date?: string; to_date?: string; type?: string; payment_method?: string; search?: string }): StatementResponse {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const filterDate = params?.date || todayStr;
+
+    const dummyTransactions: StatementTransaction[] = [
+      {
+        id: 'mock-gaming-1',
+        type: 'gaming',
+        type_label: 'لعب بلايستيشن',
+        reference: 'SESS-2026-001',
+        title: 'روم 1 - محمد',
+        customer_name: 'محمد',
+        device_or_table: 'PlayStation 5 - VIP 1',
+        duration: '1 ساعة (60 دقيقة)',
+        details: 'وقت لعب (45.00 ج.م)',
+        items_summary: '2x كانز بيبسي، 1x مياه معدنية',
+        staff_name: 'كريم',
+        payment_method: 'cash',
+        payment_method_label: 'نقدي',
+        amount_in: 95.0,
+        amount_out: 0.0,
+        net_amount: 95.0,
+        created_at: `${filterDate} 14:30:00`,
+        date_time: `${filterDate} 02:30 م`,
+        status: 'completed',
+      },
+      {
+        id: 'mock-gaming-2',
+        type: 'gaming',
+        type_label: 'لعب بلايستيشن',
+        reference: 'SESS-2026-002',
+        title: 'جهاز 4 - أحمد إبراهيم',
+        customer_name: 'أحمد إبراهيم',
+        device_or_table: 'PlayStation 4 - صالة 2',
+        duration: '2 ساعة (120 دقيقة)',
+        details: 'وقت لعب (60.00 ج.م)',
+        items_summary: '1x قهوة تركي دبل',
+        staff_name: 'كريم',
+        payment_method: 'cash',
+        payment_method_label: 'نقدي',
+        amount_in: 85.0,
+        amount_out: 0.0,
+        net_amount: 85.0,
+        created_at: `${filterDate} 15:15:00`,
+        date_time: `${filterDate} 03:15 م`,
+        status: 'completed',
+      },
+      {
+        id: 'mock-cafe-1',
+        type: 'cafe',
+        type_label: 'طلب كافيه',
+        reference: 'ORD-104',
+        title: 'طاولة 3 - كافيه',
+        customer_name: 'زياد',
+        device_or_table: 'طاولة 3',
+        duration: null,
+        details: 'طلب كافيه خارجي / صالة',
+        items_summary: '2x آيس سبانش لاتيه، 1x كابتشينو',
+        staff_name: 'سارة',
+        payment_method: 'cash',
+        payment_method_label: 'نقدي',
+        amount_in: 140.0,
+        amount_out: 0.0,
+        net_amount: 140.0,
+        created_at: `${filterDate} 16:00:00`,
+        date_time: `${filterDate} 04:00 م`,
+        status: 'completed',
+      },
+      {
+        id: 'mock-exp-1',
+        type: 'expense',
+        type_label: 'مصروفات درج',
+        reference: 'EXP-51',
+        title: 'مصروف: شراء خامات وسكر',
+        customer_name: null,
+        device_or_table: null,
+        duration: null,
+        details: 'فئة: خامات بوفيه ومشروبات',
+        items_summary: 'سكر، شاي، مناديل سحب',
+        staff_name: 'كريم',
+        payment_method: 'cash',
+        payment_method_label: 'نقدي (الدرج)',
+        amount_in: 0.0,
+        amount_out: 75.0,
+        net_amount: -75.0,
+        created_at: `${filterDate} 16:45:00`,
+        date_time: `${filterDate} 04:45 م`,
+        status: 'completed',
+      },
+      {
+        id: 'mock-gaming-3',
+        type: 'gaming',
+        type_label: 'لعب بلايستيشن',
+        reference: 'SESS-2026-003',
+        title: 'روم VIP 2 - محمود عبد الله',
+        customer_name: 'محمود عبد الله',
+        device_or_table: 'PlayStation 5 - VIP 2',
+        duration: '1.5 ساعة (90 دقيقة)',
+        details: 'وقت لعب (75.00 ج.م)',
+        items_summary: '1x ريد بول، 1x إندومي ميكس جبن',
+        staff_name: 'كريم',
+        payment_method: 'cash',
+        payment_method_label: 'نقدي',
+        amount_in: 145.0,
+        amount_out: 0.0,
+        net_amount: 145.0,
+        created_at: `${filterDate} 17:30:00`,
+        date_time: `${filterDate} 05:30 م`,
+        status: 'completed',
+      },
+    ];
+
+    let filtered = dummyTransactions;
+    if (params?.type && params.type !== 'all') {
+      filtered = filtered.filter(t => t.type === params.type);
+    }
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      filtered = filtered.filter(t => 
+        (t.title && t.title.toLowerCase().includes(q)) ||
+        (t.customer_name && t.customer_name.toLowerCase().includes(q)) ||
+        (t.reference && t.reference.toLowerCase().includes(q)) ||
+        (t.items_summary && t.items_summary.toLowerCase().includes(q))
+      );
+    }
+
+    const totalIncome = filtered.reduce((acc, t) => acc + t.amount_in, 0);
+    const totalExpenses = filtered.reduce((acc, t) => acc + t.amount_out, 0);
+    const cashIn = filtered.filter(t => t.payment_method === 'cash').reduce((acc, t) => acc + t.amount_in, 0);
+    const cashOut = filtered.filter(t => t.payment_method === 'cash').reduce((acc, t) => acc + t.amount_out, 0);
+    const gamingIncome = filtered.filter(t => t.type === 'gaming').reduce((acc, t) => acc + t.amount_in, 0);
+    const cafeIncome = filtered.filter(t => t.type === 'cafe').reduce((acc, t) => acc + t.amount_in, 0);
+
+    return {
+      period: {
+        type: params?.month ? 'month' : 'day',
+        label: params?.month ? `شهر ${params.month}` : `يوم ${filterDate}`,
+        from: `${filterDate} 00:00:00`,
+        to: `${filterDate} 23:59:59`,
+      },
+      summary: {
+        total_income: totalIncome,
+        total_expenses: totalExpenses,
+        net_income: totalIncome - totalExpenses,
+        cash_in: cashIn,
+        cash_out: cashOut,
+        net_cash: cashIn - cashOut,
+        gaming_income: gamingIncome,
+        cafe_income: cafeIncome,
+        transactions_count: filtered.length,
+      },
+      transactions: filtered,
     };
   }
 }

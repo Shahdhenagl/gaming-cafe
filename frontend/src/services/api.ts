@@ -5,6 +5,9 @@ import {
   Product,
   Shift,
   ShiftMetrics,
+  StatementResponse,
+  StatementSummary,
+  StatementTransaction,
   Table,
   ThermalReceipt,
   User,
@@ -569,7 +572,7 @@ class ApiService {
   }
 
   // --- Reports ---
-  async getDashboardReport(): Promise<{
+  async getDashboardReport(params?: { date?: string; month?: string; from_date?: string; to_date?: string }): Promise<{
     metrics: {
       total_revenue_today: number;
       cafe_revenue_today: number;
@@ -592,9 +595,29 @@ class ApiService {
   }> {
     if (isStandalone) return mockStore.getDashboardReport();
     try {
-      return await this.request('/reports/dashboard');
+      const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
+      return await this.request(`/reports/dashboard${query}`);
     } catch (error) {
       if (isLocalhost) return mockStore.getDashboardReport();
+      throw error;
+    }
+  }
+
+  async getStatement(params?: {
+    date?: string;
+    month?: string;
+    from_date?: string;
+    to_date?: string;
+    type?: string;
+    payment_method?: string;
+    search?: string;
+  }): Promise<StatementResponse> {
+    if (isStandalone) return mockStore.getStatement(params);
+    try {
+      const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
+      return await this.request<StatementResponse>(`/reports/statement${query}`);
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return mockStore.getStatement(params);
       throw error;
     }
   }
