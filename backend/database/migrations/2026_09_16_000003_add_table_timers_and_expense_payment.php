@@ -8,12 +8,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('tables', function (Blueprint $table) {
-            $table->timestamp('occupied_at')->nullable()->after('status');
-        });
-        Schema::table('expenses', function (Blueprint $table) {
-            $table->string('payment_method')->default('cash')->after('amount');
-        });
+        if (Schema::hasTable('tables') && !Schema::hasColumn('tables', 'occupied_at')) {
+            Schema::table('tables', function (Blueprint $table) {
+                $table->timestamp('occupied_at')->nullable()->after('status');
+            });
+        }
+        if (Schema::hasTable('expenses') && !Schema::hasColumn('expenses', 'payment_method')) {
+            Schema::table('expenses', function (Blueprint $table) {
+                $table->string('payment_method')->default('cash')->after('amount');
+            });
+        }
     }
 
     public function down(): void

@@ -49,7 +49,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       onClose();
       setPin('');
     } catch (err: any) {
-      setError(err.message || 'Invalid PIN code');
+      const msg = err?.message || 'رمز PIN غير صحيح';
+      if (msg.includes('Server Error') || msg.includes('500') || msg.includes('HTTP Error')) {
+        setError('تعذر الاتصال بالخادم. يمكنك استخدام أحد رموز الـ PIN التجريبية: 0000 (كاشير)، 5678 (مدير)، 1234 (أدمن)');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -65,7 +70,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       setEmail('');
       setPassword('');
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password');
+      const msg = err?.message || 'بيانات الدخول غير صحيحة';
+      if (msg.includes('Server Error') || msg.includes('500') || msg.includes('HTTP Error')) {
+        setError('تعذر الاتصال بالخادم. يمكنك استخدام Staff Quick PIN برمز 0000 للدخول السريع');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

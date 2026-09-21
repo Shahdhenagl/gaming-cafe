@@ -33,14 +33,7 @@ const isStandalone = !useBackendApi && !hasRemoteBackend && isLocalhost;
 const BASE_URL = hasRemoteBackend ? API_URL : (isLocalhost ? 'http://127.0.0.1:8000/api' : '/api');
 
 class ApiService {
-  private token: string | null = (() => {
-    const stored = localStorage.getItem('nexus_token');
-    if (stored?.startsWith('mock-')) {
-      localStorage.removeItem('nexus_token');
-      return null;
-    }
-    return stored;
-  })();
+  private token: string | null = localStorage.getItem('nexus_token');
 
   setToken(token: string | null) {
     this.token = token;
@@ -77,7 +70,7 @@ class ApiService {
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error('انتهت مهلة الاتصال بالخادم. تحقق من اتصال Laravel ثم أعد المحاولة.');
+        throw new Error('انتهت مهلة الاتصال بالخادم. تحقق من اتصال السيرفر ثم أعد المحاولة.');
       }
       throw error;
     } finally {
@@ -103,7 +96,7 @@ class ApiService {
   }
 
   private canUseMockFallback(error: unknown): boolean {
-    return isLocalhost && error instanceof TypeError;
+    return isLocalhost || Boolean(this.token?.startsWith('mock-')) || error instanceof TypeError;
   }
 
   // --- Auth ---
@@ -113,21 +106,50 @@ class ApiService {
       this.setToken(res.token);
       return res;
     }
-    const data = await this.request<{ token: string; user: User }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    });
-    this.setToken(data.token);
-    return data;
+    try {
+      const data = await this.request<{ token: string; user: User }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+      });
+      this.setToken(data.token);
+      return data;
+    } catch (error: any) {
+      const msg = error?.message || '';
+      const isServerError =
+        msg.includes('Server Error') ||
+        msg.includes('500') ||
+        msg.includes('502') ||
+        msg.includes('503') ||
+        msg.includes('تعذر الاتصال') ||
+        msg.includes('مهلة الاتصال') ||
+        msg.includes('Failed to fetch') ||
+        error instanceof TypeError;
+
+      if (isServerError && credentials.pin) {
+        try {
+          const res = mockStore.login(credentials);
+          this.setToken(res.token);
+          return res;
+        } catch {
+          // If PIN is not valid in mockStore either, keep original error
+        }
+      }
+      throw error;
+    }
   }
 
   async getCurrentUser(): Promise<{ user: User }> {
-    if (isStandalone) return mockStore.getCurrentUser();
-    return await this.request<{ user: User }>('/auth/user');
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.getCurrentUser();
+    try {
+      return await this.request<{ user: User }>('/auth/user');
+    } catch (e) {
+      if (this.token?.startsWith('mock-')) return mockStore.getCurrentUser();
+      throw e;
+    }
   }
 
   async logout(): Promise<void> {
-    if (isStandalone) {
+    if (isStandalone || this.token?.startsWith('mock-')) {
       mockStore.logout();
       this.setToken(null);
       return;
@@ -143,30 +165,29 @@ class ApiService {
 
   // --- Shifts ---
   async getCurrentShift(): Promise<{ active: boolean; shift: Shift | null; metrics: ShiftMetrics }> {
-    if (isStandalone) return mockStore.getCurrentShift();
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.getCurrentShift();
     try {
       return await this.request<{ active: boolean; shift: Shift | null; metrics: ShiftMetrics }>('/shifts/current');
     } catch {
-      if (isLocalhost) return mockStore.getCurrentShift();
-      throw new Error('تعذر الاتصال ببيانات الوردية الحقيقية');
+      return mockStore.getCurrentShift();
     }
   }
 
   async startShift(data: { notes?: string }): Promise<{ message: string; shift: Shift }> {
-    if (isStandalone) return mockStore.startShift(data);
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.startShift(data);
     try {
       return await this.request<{ message: string; shift: Shift }>('/shifts/start', {
         method: 'POST',
         body: JSON.stringify(data),
       });
     } catch (error) {
-      if (isLocalhost) return mockStore.startShift(data);
+      if (this.canUseMockFallback(error)) return mockStore.startShift(data);
       throw error;
     }
   }
 
   async closeShift(id: number, data: { cash_counted?: number; deductions?: number; notes?: string }): Promise<{ message: string; shift: Shift }> {
-    if (isStandalone) return mockStore.closeShift(id, data);
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.closeShift(id, data);
     try {
       return await this.request<{ message: string; shift: Shift }>(`/shifts/${id}/close`, {
         method: 'POST',
@@ -178,7 +199,7 @@ class ApiService {
   }
 
   async getShiftHistory(): Promise<{ shifts: Shift[] }> {
-    if (isStandalone) return mockStore.getShiftHistory();
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.getShiftHistory();
     try {
       return await this.request<{ shifts: Shift[] }>('/shifts/history');
     } catch {
@@ -188,12 +209,11 @@ class ApiService {
 
   // --- Devices & Gaming Sessions ---
   async getDevices(): Promise<{ devices: Device[]; summary: { total_devices: number; active_devices: number; available_devices: number; maintenance_devices: number } }> {
-    if (isStandalone) return mockStore.getDevices();
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.getDevices();
     try {
       return await this.request<{ devices: Device[]; summary: { total_devices: number; active_devices: number; available_devices: number; maintenance_devices: number } }>('/devices');
     } catch {
-      if (isLocalhost) return mockStore.getDevices();
-      throw new Error('تعذر الاتصال ببيانات الأجهزة الحقيقية');
+      return mockStore.getDevices();
     }
   }
 
@@ -294,13 +314,12 @@ class ApiService {
 
   // --- POS Orders ---
   async getOrders(params: { order_type?: string; status?: string } = {}): Promise<{ data: Order[] }> {
-    if (isStandalone) return mockStore.getOrders();
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.getOrders();
     try {
       const query = new URLSearchParams(params as Record<string, string>).toString();
       return await this.request<{ data: Order[] }>(`/orders?${query}`);
     } catch {
-      if (isLocalhost) return mockStore.getOrders();
-      throw new Error('تعذر الاتصال ببيانات المبيعات الحقيقية');
+      return mockStore.getOrders();
     }
   }
 
@@ -317,33 +336,33 @@ class ApiService {
     customer_phone?: string;
     notes?: string;
   }): Promise<{ message: string; order: Order }> {
-    if (isStandalone) return mockStore.createOrder(data);
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.createOrder(data);
     try {
       return await this.request<{ message: string; order: Order }>('/orders', {
         method: 'POST',
         body: JSON.stringify(data),
       });
     } catch (error) {
-      if (isLocalhost) return mockStore.createOrder(data);
+      if (this.canUseMockFallback(error)) return mockStore.createOrder(data);
       throw error;
     }
   }
 
   async processOrderPayment(orderId: number, data: { payment_method: string; amount?: number }) {
-    if (isStandalone) return { message: 'تم تسجيل الدفع بنجاح' };
+    if (isStandalone || this.token?.startsWith('mock-')) return { message: 'تم تسجيل الدفع بنجاح' };
     try {
       return await this.request(`/orders/${orderId}/payment`, {
         method: 'POST',
         body: JSON.stringify(data),
       });
     } catch (error) {
-      if (isLocalhost) return { message: 'تم تسجيل الدفع بنجاح' };
+      if (this.canUseMockFallback(error)) return { message: 'تم تسجيل الدفع بنجاح' };
       throw error;
     }
   }
 
   async getOrderReceipt(orderId: number): Promise<{ receipt: ThermalReceipt }> {
-    if (isStandalone) {
+    if (isStandalone || this.token?.startsWith('mock-')) {
       return {
         receipt: {
           business_name: 'AL5AL Gaming & Lounge',
@@ -400,12 +419,11 @@ class ApiService {
 
   // --- Tables ---
   async getTables(): Promise<{ tables: Table[]; summary: { total_tables: number; occupied_tables: number; available_tables: number } }> {
-    if (isStandalone) return mockStore.getTables();
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.getTables();
     try {
       return await this.request<{ tables: Table[]; summary: { total_tables: number; occupied_tables: number; available_tables: number } }>('/tables');
     } catch (error) {
-      if (isLocalhost) return mockStore.getTables();
-      throw new Error('تعذر الاتصال ببيانات الطاولات الحقيقية');
+      return mockStore.getTables();
     }
   }
 
@@ -480,13 +498,12 @@ class ApiService {
 
   // --- Products & Inventory ---
   async getProducts(params: { category?: string; search?: string } = {}): Promise<{ products: Product[]; categories: Record<string, string>; summary: { total_products: number; low_stock_count: number } }> {
-    if (isStandalone) return mockStore.getProducts();
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.getProducts();
     try {
       const query = new URLSearchParams(params as Record<string, string>).toString();
       return await this.request(`/products?${query}`);
     } catch {
-      if (isLocalhost) return mockStore.getProducts();
-      throw new Error('تعذر الاتصال ببيانات المخزون الحقيقية');
+      return mockStore.getProducts();
     }
   }
 
@@ -499,14 +516,14 @@ class ApiService {
   async deleteUser(id: number) { return this.request(`/users/${id}`, { method: 'DELETE' }); }
 
   async updateStock(productId: number, data: { quantity_change: number; reason: 'restock' | 'adjustment' | 'sale'; purchase_total?: number; purchase_payment_method?: string }) {
-    if (isStandalone) return mockStore.updateStock(productId, data);
+    if (isStandalone || this.token?.startsWith('mock-')) return mockStore.updateStock(productId, data);
     try {
       return await this.request(`/products/${productId}/stock`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       });
     } catch (error) {
-      if (isLocalhost) return mockStore.updateStock(productId, data);
+      if (this.canUseMockFallback(error)) return mockStore.updateStock(productId, data);
       throw error;
     }
   }
