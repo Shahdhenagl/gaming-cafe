@@ -281,4 +281,116 @@ class OrderController extends Controller
             ]
         ]);
     }
+
+    /**
+     * Update order item quantity or adjust stock.
+     */
+    public function updateItem(Request $request, $id)
+    {
+        $item = OrderItem::with(['order', 'product'])->findOrFail($id);
+
+        $request->validate([
+            'quantity' => 'required|integer|min:0',
+        ]);
+
+        $newQty = (int)$request->quantity;
+        $oldQty = (int)$item->quantity;
+
+        if ($newQty === $oldQty) {
+            return response()->json([
+                'message' => 'لم يتغير شيء بالكمية',
+                'item' => $item,
+                'order' => $item->order->load(['items.product']),
+            ]);
+        }
+
+        $result = DB::transaction(function () use ($item, $newQty, $oldQty, $request) {
+            $order = $item->order;
+            $product = $item->product;
+            $diff = $newQty - $oldQty;
+
+            if ($diff > 0) {
+                // Customer ordered more
+                if ($product) {
+                    $product->decrement('stock_quantity', $diff);
+                    InventoryLog::create([
+                        'product_id' => $product->id,
+                        'quantity_change' => -$diff,
+                        'reason' => 'sale',
+                        'staff_id' => $request->user()?->id,
+                    ]);
+                }
+            } elseif ($diff < 0) {
+                // Customer cancelled/reduced items - return to stock
+                $returnQty = abs($diff);
+                if ($product) {
+                    $product->increment('stock_quantity', $returnQty);
+                    InventoryLog::create([
+                        'product_id' => $product->id,
+                        'quantity_change' => $returnQty,
+                        'reason' => 'return',
+                        'staff_id' => $request->user()?->id,
+                    ]);
+                }
+            }
+
+            if ($newQty === 0) {
+                $item->delete();
+            } else {
+                $itemSubtotal = round($newQty * (float)$item->unit_price, 2);
+                $item->update([
+                    'quantity' => $newQty,
+                    'subtotal' => $itemSubtotal,
+                ]);
+            }
+
+            // Recalculate order subtotal
+            $newOrderSubtotal = (float)$order->items()->sum('subtotal');
+            $newOrderTotal = max(0, $newOrderSubtotal - (float)$order->discount);
+            $order->update([
+                'subtotal' => $newOrderSubtotal,
+                'total_amount' => $newOrderTotal,
+            ]);
+
+            // Sync Table if applicable
+            if ($order->table_id) {
+                $table = Table::find($order->table_id);
+                if ($table) {
+                    $table->update(['total_spent' => $newOrderTotal]);
+                }
+            }
+
+            // Sync DeviceSession if applicable
+            if ($order->device_session_id) {
+                $session = DeviceSession::find($order->device_session_id);
+                if ($session) {
+                    $newBeverageCost = (float)$session->orders()->sum('total_amount');
+                    $sessionCost = (float)$session->session_cost;
+                    $newSessionTotal = max(0, $sessionCost + $newBeverageCost - (float)$session->discount);
+                    $session->update([
+                        'beverage_cost' => $newBeverageCost,
+                        'total_amount' => $newSessionTotal,
+                    ]);
+                }
+            }
+
+            return ['order' => $order->fresh(['items.product']), 'item' => $newQty > 0 ? $item->fresh('product') : null];
+        });
+
+        return response()->json([
+            'message' => $newQty === 0 ? 'تم حذف الصنف وإعادة الكمية إلى المخزون بنجاح' : 'تم تعديل كمية الصنف وتحديث المخزون بنجاح',
+            'order' => $result['order'],
+            'item' => $result['item'],
+        ]);
+    }
+
+    /**
+     * Delete order item and restore stock completely.
+     */
+    public function destroyItem(Request $request, $id)
+    {
+        $request->merge(['quantity' => 0]);
+        return $this->updateItem($request, $id);
+    }
 }
+

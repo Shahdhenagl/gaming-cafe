@@ -10,7 +10,9 @@ import {
   Receipt,
   Search,
   X,
-  CreditCard
+  CreditCard,
+  Trash2,
+  Minus
 } from 'lucide-react';
 import { Device, Product, Table, ThermalReceipt } from '../types';
 import { Language, translations } from '../i18n/translations';
@@ -168,6 +170,42 @@ export const TableManagement: React.FC<TableManagementProps> = ({
     if (!window.confirm(`حذف الطاولة ${table.table_number}؟`)) return;
     await api.deleteTable(table.id);
     onRefresh();
+  };
+
+  const [updatingItemId, setUpdatingItemId] = useState<number | null>(null);
+
+  const handleUpdateItemQty = async (table: Table, itemId: number, newQty: number) => {
+    setUpdatingItemId(itemId);
+    try {
+      if (newQty <= 0) {
+        await api.deleteOrderItem(itemId);
+      } else {
+        await api.updateOrderItem(itemId, newQty);
+      }
+      sounds.playClick();
+      onRefresh();
+      if (selectedTable && selectedTable.id === table.id && selectedTable.order) {
+        const updatedItems = selectedTable.order.items
+          ?.map((it: any) => (it.id === itemId ? (newQty > 0 ? { ...it, quantity: newQty, subtotal: it.unit_price * newQty } : null) : it))
+          .filter(Boolean);
+        const newSubtotal = updatedItems?.reduce((sum: number, i: any) => sum + i.subtotal, 0) || 0;
+        setSelectedTable({
+          ...selectedTable,
+          total_spent: newSubtotal,
+          order: {
+            ...selectedTable.order,
+            items: updatedItems,
+            items_count: updatedItems.length,
+            subtotal: newSubtotal,
+            total_amount: newSubtotal,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('Failed to update table order item:', err);
+    } finally {
+      setUpdatingItemId(null);
+    }
   };
 
   const filteredProducts = products.filter((p) => {
@@ -410,26 +448,68 @@ export const TableManagement: React.FC<TableManagementProps> = ({
                     </button>
                   </div>
 
-                  {/* Items list */}
-                  <div className="max-h-48 overflow-y-auto space-y-2 divide-y divide-border/40 p-3 rounded-xl bg-surface/60 border border-border">
-                    {selectedTable.order?.items && selectedTable.order.items.length > 0 ? (
-                      selectedTable.order.items.map((it: any, idx: number) => (
-                        <div key={idx} className="pt-2 flex justify-between items-center text-xs">
-                          <div>
-                            <span className="text-white font-bold">{it.quantity}x </span>
-                            <span className="text-slate-200">{lang === 'ar' ? it.name_ar || it.name : it.name}</span>
+                    {/* Items list */}
+                    <div className="max-h-60 overflow-y-auto space-y-2 divide-y divide-border/40 p-3 rounded-xl bg-surface/60 border border-border">
+                      {selectedTable.order?.items && selectedTable.order.items.length > 0 ? (
+                        selectedTable.order.items.map((it: any, idx: number) => (
+                          <div key={it.id || idx} className="pt-2 flex justify-between items-center text-xs">
+                            <div className="flex-1 pr-2">
+                              <span className="text-white font-bold">{it.quantity}x </span>
+                              <span className="text-slate-200">{lang === 'ar' ? it.name_ar || it.name : it.name}</span>
+                              <span className="text-[10px] text-slate-400 block">
+                                بسعر {formatMoney(it.unit_price)} {t.currency} للواحد
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-amber-400 font-bold text-sm" dir="ltr">
+                                {formatMoney(it.subtotal)} {t.currency}
+                              </span>
+                              {/* Item modification controls */}
+                              <div className="flex items-center gap-1 bg-card p-0.5 rounded-lg border border-border/80">
+                                <button
+                                  type="button"
+                                  title="إنقاص الكمية"
+                                  disabled={updatingItemId === it.id}
+                                  onClick={() => handleUpdateItemQty(selectedTable, it.id, it.quantity - 1)}
+                                  className="w-6 h-6 rounded bg-surface hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 flex items-center justify-center transition disabled:opacity-40"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                                <span className="w-5 text-center font-mono font-bold text-white text-xs">
+                                  {it.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  title="زيادة الكمية"
+                                  disabled={updatingItemId === it.id}
+                                  onClick={() => handleUpdateItemQty(selectedTable, it.id, it.quantity + 1)}
+                                  className="w-6 h-6 rounded bg-surface hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 flex items-center justify-center transition disabled:opacity-40"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="حذف الصنف نهائياً وإرجاعه للمخزن"
+                                  disabled={updatingItemId === it.id}
+                                  onClick={() => {
+                                    if (window.confirm(`هل أنت متأكد من حذف ${lang === 'ar' ? it.name_ar || it.name : it.name} وإرجاعه للمخزون؟`)) {
+                                      handleUpdateItemQty(selectedTable, it.id, 0);
+                                    }
+                                  }}
+                                  className="w-6 h-6 rounded bg-surface hover:bg-rose-600 text-rose-400 hover:text-white flex items-center justify-center transition disabled:opacity-40 ml-1"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                          <span className="font-mono text-amber-400 font-bold" dir="ltr">
-                            {formatMoney(it.subtotal)} {t.currency}
-                          </span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-slate-500 text-center py-4">
-                        لا توجد طلبات مسجلة على الطاولة بعد. اضغطي «إضافة مشاريب» بالأعلى لإضافة طلبات.
-                      </p>
-                    )}
-                  </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-slate-500 text-center py-4">
+                          لا توجد طلبات مسجلة على الطاولة بعد. اضغطي «إضافة مشاريب» بالأعلى لإضافة طلبات.
+                        </p>
+                      )}
+                    </div>
 
                   {/* Total and Checkout summary */}
                   <div className="pt-3 border-t border-border flex justify-between items-center text-base font-black text-white">

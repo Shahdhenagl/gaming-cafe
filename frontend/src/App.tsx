@@ -373,6 +373,7 @@ export function App() {
                 onExtendSession={handleExtendGamingSession}
                 onAddBeverageToSession={handleAddBeverageToSession}
                 onEndSession={handleEndGamingSession}
+                onShowReceipt={(receipt) => setReceiptModalData(receipt)}
                 onRefresh={loadInitialData}
               />
             )}

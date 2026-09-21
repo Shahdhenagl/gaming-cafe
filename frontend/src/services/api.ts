@@ -241,6 +241,57 @@ class ApiService {
     }
   }
 
+  async addManualSession(data: {
+    device_id: number;
+    customer_name?: string;
+    customer_phone?: string;
+    duration_minutes?: number;
+    start_time?: string;
+    end_time?: string;
+    hourly_rate?: number;
+    session_cost?: number;
+    discount?: number;
+    payment_method: string;
+    amount_paid?: number;
+    items?: { product_id: number; quantity: number; notes?: string }[];
+  }) {
+    if (isStandalone) return mockStore.addManualSession(data);
+    try {
+      return await this.request<{ message: string; session: any; receipt?: ThermalReceipt }>('/sessions/manual', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return mockStore.addManualSession(data);
+      throw error;
+    }
+  }
+
+  async updateOrderItem(orderItemId: number, quantity: number) {
+    if (isStandalone) return mockStore.updateOrderItemQuantity(orderItemId, quantity);
+    try {
+      return await this.request<{ message: string; order: any; item: any }>(`/order-items/${orderItemId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ quantity }),
+      });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return mockStore.updateOrderItemQuantity(orderItemId, quantity);
+      throw error;
+    }
+  }
+
+  async deleteOrderItem(orderItemId: number) {
+    if (isStandalone) return mockStore.deleteOrderItem(orderItemId);
+    try {
+      return await this.request<{ message: string; order: any }>(`/order-items/${orderItemId}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return mockStore.deleteOrderItem(orderItemId);
+      throw error;
+    }
+  }
+
   // --- POS Orders ---
   async getOrders(params: { order_type?: string; status?: string } = {}): Promise<{ data: Order[] }> {
     if (isStandalone) return mockStore.getOrders();

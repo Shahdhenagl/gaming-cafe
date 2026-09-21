@@ -577,19 +577,247 @@ class MockStore {
     const dev = this.data.devices.find((d) => d.active_session?.id === sessionId);
     if (!dev || !dev.active_session) throw new Error('الجلسة غير موجودة');
 
+    if (!dev.active_session.orders) {
+      dev.active_session.orders = [];
+    }
+    let order = dev.active_session.orders[0];
+    if (!order) {
+      order = {
+        id: Date.now(),
+        order_number: 'ORD-G' + Math.floor(100 + Math.random() * 900),
+        status: 'completed',
+        order_type: 'gaming_room',
+        device_session_id: sessionId,
+        subtotal: 0,
+        discount: 0,
+        tax: 0,
+        total_amount: 0,
+        payment_method: 'cash',
+        payment_status: 'unpaid',
+        items: [],
+      };
+      dev.active_session.orders.push(order);
+    }
+    if (!order.items) order.items = [];
+
     let addedBev = 0;
     items.forEach((it) => {
       const prod = this.data.products.find((p) => p.id === it.product_id);
       if (prod) {
-        addedBev += prod.price * it.quantity;
+        const itemSubtotal = prod.price * it.quantity;
+        addedBev += itemSubtotal;
         prod.stock_quantity = Math.max(0, prod.stock_quantity - it.quantity);
+
+        const existingItem = order.items?.find((i) => i.product_id === it.product_id);
+        if (existingItem) {
+          existingItem.quantity += it.quantity;
+          existingItem.subtotal += itemSubtotal;
+        } else {
+          order.items?.push({
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            order_id: order.id,
+            product_id: prod.id,
+            product: prod,
+            quantity: it.quantity,
+            unit_price: prod.price,
+            subtotal: itemSubtotal,
+            notes: it.notes,
+          });
+        }
       }
     });
+
+    order.subtotal += addedBev;
+    order.total_amount += addedBev;
 
     dev.active_session.beverage_cost += addedBev;
     dev.active_session.total_amount += addedBev;
     this.save();
     return { message: 'تمت إضافة المشروبات للجلسة بنجاح', session: dev.active_session };
+  }
+
+  addManualSession(data: {
+    device_id: number;
+    customer_name?: string;
+    customer_phone?: string;
+    duration_minutes?: number;
+    start_time?: string;
+    end_time?: string;
+    hourly_rate?: number;
+    session_cost?: number;
+    discount?: number;
+    payment_method: string;
+    amount_paid?: number;
+    items?: { product_id: number; quantity: number; notes?: string }[];
+  }) {
+    const dev = this.data.devices.find((d) => d.id === data.device_id);
+    if (!dev) throw new Error('الجهاز غير موجود');
+
+    const duration = data.duration_minutes || 60;
+    const rate = data.hourly_rate ?? dev.hourly_rate;
+    const sessionCost = data.session_cost ?? Math.round(((duration / 60) * rate) * 100) / 100;
+    let beverageCost = 0;
+    const orderItems: any[] = [];
+
+    if (data.items && data.items.length > 0) {
+      data.items.forEach((it) => {
+        const prod = this.data.products.find((p) => p.id === it.product_id);
+        if (prod) {
+          const itemSubtotal = prod.price * it.quantity;
+          beverageCost += itemSubtotal;
+          prod.stock_quantity = Math.max(0, prod.stock_quantity - it.quantity);
+          orderItems.push({
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            product_id: prod.id,
+            name: prod.name,
+            name_ar: prod.name_ar || prod.name,
+            product: prod,
+            quantity: it.quantity,
+            unit_price: prod.price,
+            subtotal: itemSubtotal,
+          });
+        }
+      });
+    }
+
+    const discount = data.discount || 0;
+    const finalTotal = Math.max(0, sessionCost + beverageCost - discount);
+    const paidAmount = data.payment_method === 'credit' ? 0 : (data.amount_paid ?? finalTotal);
+
+    if (this.data.currentShift) {
+      this.data.currentShift.total_before_deductions += sessionCost + beverageCost;
+      this.data.currentShift.total_after_deductions += finalTotal;
+      if (data.payment_method === 'cash') {
+        this.data.currentShift.cash_collected += paidAmount;
+      } else {
+        this.data.currentShift.card_collected += paidAmount;
+      }
+    }
+
+    const receipt: ThermalReceipt = {
+      business_name: 'AL5AL Gaming & Lounge',
+      business_name_ar: 'صالة الخال للألعاب والبلياردو والكافيه',
+      order_number: 'MANUAL-' + Math.floor(1000 + Math.random() * 9000),
+      date_time: new Date().toLocaleString('ar-EG'),
+      staff_name: this.data.currentUser?.name || 'كاشير الصالة',
+      order_type: 'gaming_room',
+      device_name: dev.device_name_ar || dev.device_name,
+      customer_name: data.customer_name || 'عميل يدوي / أوفلاين',
+      duration_minutes: duration,
+      start_time: data.start_time || new Date(Date.now() - duration * 60000).toLocaleTimeString('ar-EG'),
+      end_time: data.end_time || new Date().toLocaleTimeString('ar-EG'),
+      session_cost: sessionCost,
+      beverage_cost: beverageCost,
+      subtotal: sessionCost + beverageCost,
+      discount: discount,
+      tax: 0,
+      total_amount: finalTotal,
+      payment_method: data.payment_method,
+      payment_status: data.payment_method === 'credit' ? 'unpaid' : 'paid',
+      items: [
+        {
+          name: `وقت اللعب (${duration} دقيقة)`,
+          name_ar: `وقت اللعب (${duration} دقيقة)`,
+          quantity: 1,
+          unit_price: sessionCost,
+          subtotal: sessionCost,
+        },
+        ...orderItems,
+      ],
+      footer_note: 'Thank you for playing at AL5AL! ★ Enjoy The Game ★',
+      footer_note_ar: 'شكراً لزيارتكم صالة الخال! ★ استمتع بأفضل تجربة وتحدي ★',
+    };
+
+    this.save();
+    return { message: 'تم تسجيل الجلسة اليدوية وإدخال الإيراد في الخزنة والشيفت بنجاح', receipt };
+  }
+
+  updateOrderItemQuantity(orderItemId: number, quantity: number) {
+    let targetItem: any = null;
+    let targetOrder: any = null;
+    let isTable = false;
+    let isSession = false;
+    let targetTable: any = null;
+    let targetDevice: any = null;
+
+    // Check in tables
+    for (const tbl of this.data.tables) {
+      if (tbl.order?.items) {
+        const it = tbl.order.items.find((i: any) => i.id === orderItemId);
+        if (it) {
+          targetItem = it;
+          targetOrder = tbl.order;
+          isTable = true;
+          targetTable = tbl;
+          break;
+        }
+      }
+    }
+
+    // Check in device sessions
+    if (!targetItem) {
+      for (const dev of this.data.devices) {
+        if (dev.active_session?.orders) {
+          for (const ord of dev.active_session.orders) {
+            const it = ord.items?.find((i: any) => i.id === orderItemId);
+            if (it) {
+              targetItem = it;
+              targetOrder = ord;
+              isSession = true;
+              targetDevice = dev;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!targetItem || !targetOrder) {
+      throw new Error('الصنف غير موجود بالطلب');
+    }
+
+    const prod = this.data.products.find((p) => p.id === targetItem.product_id);
+    const oldQty = targetItem.quantity;
+    const diff = quantity - oldQty;
+
+    if (diff > 0) {
+      if (prod) prod.stock_quantity = Math.max(0, prod.stock_quantity - diff);
+    } else if (diff < 0) {
+      if (prod) prod.stock_quantity += Math.abs(diff);
+    }
+
+    if (quantity === 0) {
+      targetOrder.items = targetOrder.items.filter((i: any) => i.id !== orderItemId);
+    } else {
+      targetItem.quantity = quantity;
+      targetItem.subtotal = targetItem.unit_price * quantity;
+    }
+
+    const newSubtotal = targetOrder.items.reduce((sum: number, i: any) => sum + i.subtotal, 0);
+    targetOrder.subtotal = newSubtotal;
+    targetOrder.total_amount = Math.max(0, newSubtotal - (targetOrder.discount || 0));
+    targetOrder.items_count = targetOrder.items.length;
+
+    if (isTable && targetTable) {
+      targetTable.total_spent = targetOrder.total_amount;
+    }
+
+    if (isSession && targetDevice && targetDevice.active_session) {
+      const bevTotal = targetDevice.active_session.orders.reduce((sum: number, o: any) => sum + o.total_amount, 0);
+      targetDevice.active_session.beverage_cost = bevTotal;
+      targetDevice.active_session.total_amount = (targetDevice.active_session.session_cost || 0) + bevTotal - (targetDevice.active_session.discount || 0);
+    }
+
+    this.save();
+    return {
+      message: quantity === 0 ? 'تم حذف الصنف وإعادة الكمية للمخزن' : 'تم تعديل كمية الصنف وتحديث المخزن',
+      order: targetOrder,
+      item: quantity > 0 ? targetItem : null,
+    };
+  }
+
+  deleteOrderItem(orderItemId: number) {
+    return this.updateOrderItemQuantity(orderItemId, 0);
   }
 
   endSession(sessionId: number, data: { payment_method: string; discount?: number; amount_paid?: number }) {

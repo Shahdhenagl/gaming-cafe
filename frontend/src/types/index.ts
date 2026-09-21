@@ -197,6 +197,12 @@ export interface ThermalReceipt {
   order_type: OrderType;
   table_number?: string | null;
   device_name?: string | null;
+  customer_name?: string | null;
+  duration_minutes?: number | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  session_cost?: number | null;
+  beverage_cost?: number | null;
   items: {
     name: string;
     name_ar?: string;

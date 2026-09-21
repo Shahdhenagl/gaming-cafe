@@ -15,12 +15,16 @@ import {
   Flame, 
   Sparkles,
   Search,
-  X
+  X,
+  Trash2,
+  Minus,
+  History
 } from 'lucide-react';
 import { Device, Product, ThermalReceipt } from '../types';
 import { Language, translations } from '../i18n/translations';
 import { sounds } from '../utils/audio';
 import { formatSeconds, safeNum, formatMoney } from '../utils/format';
+import { api } from '../services/api';
 
 interface GamingRoomProps {
   lang: Language;
@@ -30,6 +34,7 @@ interface GamingRoomProps {
   onExtendSession: (sessionId: number, addedMinutes: number) => Promise<void>;
   onAddBeverageToSession: (sessionId: number, items: { product_id: number; quantity: number }[]) => Promise<void>;
   onEndSession: (sessionId: number, data: { payment_method: string; discount?: number; amount_paid?: number; customer_name?: string; customer_phone?: string }) => Promise<ThermalReceipt | void>;
+  onShowReceipt?: (receipt: ThermalReceipt) => void;
   onRefresh: () => void;
 }
 
@@ -41,6 +46,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
   onExtendSession,
   onAddBeverageToSession,
   onEndSession,
+  onShowReceipt,
   onRefresh,
 }) => {
   const t = translations[lang];
@@ -72,6 +78,23 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
   const [endDiscount, setEndDiscount] = useState<string>('0');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string>('');
+
+  // Item update state inside session
+  const [updatingSessionItemId, setUpdatingSessionItemId] = useState<number | null>(null);
+
+  // Manual / Offline Session Modal state
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [manualDeviceId, setManualDeviceId] = useState<number>(devices[0]?.id || 0);
+  const [manualCustomerName, setManualCustomerName] = useState('');
+  const [manualCustomerPhone, setManualCustomerPhone] = useState('');
+  const [manualDuration, setManualDuration] = useState<number>(60);
+  const [manualCustomDuration, setManualCustomDuration] = useState<string>('');
+  const [manualHourlyRate, setManualHourlyRate] = useState<string>('');
+  const [manualDrinks, setManualDrinks] = useState<{ [productId: number]: number }>({});
+  const [manualPaymentMethod, setManualPaymentMethod] = useState<string>('cash');
+  const [manualDiscount, setManualDiscount] = useState<string>('0');
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualError, setManualError] = useState('');
 
   const getOpenEndedElapsedSeconds = (startTime: string) =>
     Math.max(0, Math.floor((Date.now() - new Date(startTime).getTime()) / 1000));
@@ -246,6 +269,99 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
     }
   };
 
+  const handleUpdateSessionItem = async (itemId: number, newQty: number) => {
+    setUpdatingSessionItemId(itemId);
+    try {
+      if (newQty <= 0) {
+        await api.deleteOrderItem(itemId);
+      } else {
+        await api.updateOrderItem(itemId, newQty);
+      }
+      sounds.playClick();
+      onRefresh();
+
+      if (drinkModalDevice?.active_session?.orders) {
+        const updatedOrders = drinkModalDevice.active_session.orders.map((ord) => {
+          const updatedItems = (ord.items || [])
+            .map((it) => (it.id === itemId ? (newQty > 0 ? { ...it, quantity: newQty, subtotal: it.unit_price * newQty } : null) : it))
+            .filter(Boolean) as any[];
+          const newSub = updatedItems.reduce((s, i) => s + i.subtotal, 0);
+          return { ...ord, items: updatedItems, subtotal: newSub, total_amount: newSub };
+        });
+        const newBevCost = updatedOrders.reduce((s, o) => s + o.total_amount, 0);
+        const newTotal = (drinkModalDevice.active_session.session_cost || 0) + newBevCost - (drinkModalDevice.active_session.discount || 0);
+        setDrinkModalDevice({
+          ...drinkModalDevice,
+          active_session: {
+            ...drinkModalDevice.active_session,
+            beverage_cost: newBevCost,
+            total_amount: newTotal,
+            orders: updatedOrders,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('Failed to update session item:', err);
+    } finally {
+      setUpdatingSessionItemId(null);
+    }
+  };
+
+  const handleManualSessionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const dev = devices.find((d) => d.id === manualDeviceId);
+    if (!dev) {
+      setManualError('يرجى اختيار الجهاز');
+      return;
+    }
+
+    if (manualPaymentMethod === 'credit' && (!manualCustomerName.trim() || !manualCustomerPhone.trim())) {
+      setManualError('يرجى كتابة اسم العميل ورقم الهاتف للآجل');
+      return;
+    }
+
+    const duration = manualCustomDuration ? parseInt(manualCustomDuration, 10) : manualDuration;
+    if (!duration || duration <= 0) {
+      setManualError('يرجى تحديد مدة اللعب');
+      return;
+    }
+
+    const drinks = Object.entries(manualDrinks)
+      .filter(([_, qty]) => qty > 0)
+      .map(([id, qty]) => ({ product_id: Number(id), quantity: qty }));
+
+    setManualLoading(true);
+    setManualError('');
+    try {
+      const res = await api.addManualSession({
+        device_id: manualDeviceId,
+        customer_name: manualCustomerName.trim() || undefined,
+        customer_phone: manualCustomerPhone.trim() || undefined,
+        duration_minutes: duration,
+        hourly_rate: manualHourlyRate ? parseFloat(manualHourlyRate) : dev.hourly_rate,
+        discount: parseFloat(manualDiscount) || 0,
+        payment_method: manualPaymentMethod,
+        items: drinks.length > 0 ? drinks : undefined,
+      });
+
+      sounds.playCashRegister();
+      setManualModalOpen(false);
+      setManualDrinks({});
+      setManualCustomerName('');
+      setManualCustomerPhone('');
+      setManualDiscount('0');
+      onRefresh();
+
+      if (res.receipt && onShowReceipt) {
+        onShowReceipt(res.receipt);
+      }
+    } catch (err: any) {
+      setManualError(err?.message || 'تعذر تسجيل الجلسة اليدوية');
+    } finally {
+      setManualLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {actionError && <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-300">{actionError}</div>}
@@ -301,6 +417,28 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setManualModalOpen(true);
+              setManualDeviceId(devices[0]?.id || 0);
+              setManualDuration(60);
+              setManualCustomDuration('');
+              setManualHourlyRate('');
+              setManualDrinks({});
+              setManualCustomerName('');
+              setManualCustomerPhone('');
+              setManualDiscount('0');
+              setManualPaymentMethod('cash');
+              setManualError('');
+            }}
+            className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-neon-purple flex items-center gap-1.5 transition whitespace-nowrap"
+            title="تسجيل جلسة سابقة كانت بالورقة عند انقطاع النت لإدخالها في إيراد الخزنة"
+          >
+            <History className="w-3.5 h-3.5 text-purple-200" />
+            <span>+ إضافة جلسة سابقة (يدوية)</span>
+          </button>
         </div>
       </div>
 
@@ -720,10 +858,83 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
               </button>
             </div>
 
+            {/* Current Active Session Items */}
+            {(() => {
+              const currentItems = (drinkModalDevice.active_session.orders || []).flatMap((o: any) => o.items || []);
+              if (currentItems.length === 0) return null;
+              return (
+                <div className="mx-6 mt-4 p-3 bg-surface/80 border border-border/80 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                    <h4 className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                      <Coffee className="w-3.5 h-3.5 text-amber-400" />
+                      <span>الأصناف المسجلة بالجلسة حالياً:</span>
+                    </h4>
+                    <span className="text-xs font-mono font-bold text-amber-400" dir="ltr">
+                      +{formatMoney(drinkModalDevice.active_session.beverage_cost)} {t.currency}
+                    </span>
+                  </div>
+                  <div className="max-h-36 overflow-y-auto space-y-1.5 divide-y divide-border/40">
+                    {currentItems.map((it: any, idx: number) => (
+                      <div key={it.id || idx} className="pt-1.5 flex items-center justify-between text-xs">
+                        <div className="flex-1">
+                          <span className="text-white font-bold">{it.quantity}x </span>
+                          <span className="text-slate-200">{lang === 'ar' ? it.name_ar || it.product?.name_ar || it.name : it.name}</span>
+                          <span className="text-[10px] text-slate-400 block">
+                            {formatMoney(it.unit_price)} {t.currency} للواحد
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-amber-400 font-bold" dir="ltr">
+                            {formatMoney(it.subtotal)} {t.currency}
+                          </span>
+                          <div className="flex items-center gap-1 bg-card p-0.5 rounded-lg border border-border/80">
+                            <button
+                              type="button"
+                              title="إنقاص الكمية"
+                              disabled={updatingSessionItemId === it.id}
+                              onClick={() => handleUpdateSessionItem(it.id, it.quantity - 1)}
+                              className="w-5 h-5 rounded bg-surface hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 flex items-center justify-center transition disabled:opacity-40"
+                            >
+                              <Minus className="w-2.5 h-2.5" />
+                            </button>
+                            <span className="w-4 text-center font-mono font-bold text-white text-xs">
+                              {it.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              title="زيادة الكمية"
+                              disabled={updatingSessionItemId === it.id}
+                              onClick={() => handleUpdateSessionItem(it.id, it.quantity + 1)}
+                              className="w-5 h-5 rounded bg-surface hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 flex items-center justify-center transition disabled:opacity-40"
+                            >
+                              <Plus className="w-2.5 h-2.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title="حذف الصنف وإرجاعه للمخزن"
+                              disabled={updatingSessionItemId === it.id}
+                              onClick={() => {
+                                if (window.confirm(`هل أنت متأكد من حذف ${lang === 'ar' ? it.name_ar || it.product?.name_ar || it.name : it.name} وإرجاعه للمخزن؟`)) {
+                                  handleUpdateSessionItem(it.id, 0);
+                                }
+                              }}
+                              className="w-5 h-5 rounded bg-surface hover:bg-rose-600 text-rose-400 hover:text-white flex items-center justify-center transition disabled:opacity-40 ml-1"
+                            >
+                              <Trash2 className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Products Picker */}
             <div className="p-6 overflow-y-auto space-y-3">
               <p className="text-xs text-slate-400">
-                Select drinks or snacks to charge directly onto this gamer's tab:
+                إضافة أصناف ومشروبات جديدة إلى حساب الجلسة:
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {products.map((p) => {
@@ -920,6 +1131,294 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                   className="px-5 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-500 text-white shadow-neon-rose transition disabled:opacity-50"
                 >
                   {actionLoading ? 'Settling...' : t.confirmEnd}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MANUAL / OFFLINE SESSION MODAL --- */}
+      {manualModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface/80">
+              <div className="flex items-center gap-2">
+                <History className="w-5 h-5 text-purple-400" />
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    إضافة جلسة سابقة / يدوية (أوفلاين)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    لتسجيل الجلسات المسجلة بالورقة عند انقطاع النت لإدخالها في الإيراد والخزنة فوراً
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setManualModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-card text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleManualSessionSubmit} className="p-6 overflow-y-auto space-y-4">
+              {manualError && (
+                <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-300">
+                  {manualError}
+                </div>
+              )}
+
+              {/* Choose Device */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  اختر الجهاز / المحطة *
+                </label>
+                <select
+                  value={manualDeviceId}
+                  onChange={(e) => {
+                    const devId = Number(e.target.value);
+                    setManualDeviceId(devId);
+                    const d = devices.find((x) => x.id === devId);
+                    if (d) setManualHourlyRate(d.hourly_rate.toString());
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-xs focus:outline-none focus:border-primary"
+                >
+                  {devices.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {lang === 'ar' && d.device_name_ar ? d.device_name_ar : d.device_name} ({d.room_name}) - {d.hourly_rate} {t.currency}/ساعة
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Customer Info (Optional) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    اسم العميل (اختياري)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="مثال: أحمد محمد"
+                    value={manualCustomerName}
+                    onChange={(e) => setManualCustomerName(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-white text-xs placeholder-slate-500 focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    رقم الهاتف (اختياري)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="010XXXXXXXX"
+                    value={manualCustomerPhone}
+                    onChange={(e) => setManualCustomerPhone(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-white text-xs placeholder-slate-500 focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Duration Presets */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  مدة اللعب المسجلة بالورقة *
+                </label>
+                <div className="grid grid-cols-5 gap-1.5 mb-2">
+                  {[30, 45, 60, 90, 120].map((mins) => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => {
+                        setManualDuration(mins);
+                        setManualCustomDuration('');
+                      }}
+                      className={`py-1.5 rounded-xl text-xs font-bold transition border ${
+                        !manualCustomDuration && manualDuration === mins
+                          ? 'bg-purple-600 text-white border-purple-500 shadow-neon-purple'
+                          : 'bg-surface text-slate-300 border-border hover:border-slate-500'
+                      }`}
+                    >
+                      {mins < 60 ? `${mins} دقيقة` : `${mins / 60} ساعة`}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  max="1440"
+                  placeholder="أو أدخل المدة بالدقائق مخصصة (مثال: 75 دقيقة)"
+                  value={manualCustomDuration}
+                  onChange={(e) => setManualCustomDuration(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-white text-xs placeholder-slate-500 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              {/* Hourly rate adjustment */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    سعر الساعة ({t.currency})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={manualHourlyRate}
+                    placeholder={(devices.find((d) => d.id === manualDeviceId)?.hourly_rate || 30).toString()}
+                    onChange={(e) => setManualHourlyRate(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-white text-xs focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    حساب الوقت المحسوب
+                  </label>
+                  <div className="px-3 py-1.5 rounded-xl bg-surface/50 border border-border text-emerald-400 font-mono font-bold text-xs">
+                    {(() => {
+                      const d = devices.find((x) => x.id === manualDeviceId);
+                      const dur = manualCustomDuration ? parseInt(manualCustomDuration, 10) : manualDuration;
+                      const rate = manualHourlyRate ? parseFloat(manualHourlyRate) : (d?.hourly_rate || 30);
+                      const cost = Math.round(((dur / 60) * rate) * 100) / 100;
+                      return `${formatMoney(cost)} ${t.currency}`;
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Consumed Drinks / Snacks during session */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  مشروبات أو تسالي تم استهلاكها (اختياري)
+                </label>
+                <div className="max-h-36 overflow-y-auto grid grid-cols-2 gap-1.5 p-2 rounded-xl bg-surface border border-border">
+                  {products.map((p) => {
+                    const qty = manualDrinks[p.id] || 0;
+                    return (
+                      <div
+                        key={p.id}
+                        className={`p-2 rounded-lg border flex items-center justify-between transition ${
+                          qty > 0 ? 'bg-primary/10 border-primary' : 'bg-card border-border/60'
+                        }`}
+                      >
+                        <div className="truncate max-w-[110px]">
+                          <p className="font-bold text-[11px] text-white truncate">{p.name}</p>
+                          <p className="text-[9px] text-amber-400 font-mono" dir="ltr">
+                            {formatMoney(p.price)} {t.currency}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {qty > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setManualDrinks((prev) => ({ ...prev, [p.id]: Math.max(0, qty - 1) }))}
+                              className="w-5 h-5 rounded bg-surface text-slate-300 hover:text-white flex items-center justify-center text-xs"
+                            >
+                              -
+                            </button>
+                          )}
+                          {qty > 0 && <span className="font-mono text-xs font-bold text-white px-1">{qty}</span>}
+                          <button
+                            type="button"
+                            onClick={() => setManualDrinks((prev) => ({ ...prev, [p.id]: qty + 1 }))}
+                            className="w-5 h-5 rounded bg-primary text-white flex items-center justify-center text-xs"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Discount & Payment Method */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    خصم (اختياري)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={manualDiscount}
+                    onChange={(e) => setManualDiscount(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-white text-xs focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    طريقة الدفع *
+                  </label>
+                  <select
+                    value={manualPaymentMethod}
+                    onChange={(e) => setManualPaymentMethod(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-white text-xs focus:outline-none focus:border-primary"
+                  >
+                    <option value="cash">كاش نقدية (يدخل في درج الخزنة)</option>
+                    <option value="visa">فيزا / بطاقة</option>
+                    <option value="instapay">إنستاباي / محفظة</option>
+                    <option value="credit">آجل (تسجيل على حساب العميل)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Total Calculation Preview */}
+              {(() => {
+                const d = devices.find((x) => x.id === manualDeviceId);
+                const dur = manualCustomDuration ? parseInt(manualCustomDuration, 10) : manualDuration;
+                const rate = manualHourlyRate ? parseFloat(manualHourlyRate) : (d?.hourly_rate || 30);
+                const sessionCost = Math.round(((dur / 60) * rate) * 100) / 100;
+                const beverageCost = Object.entries(manualDrinks).reduce((sum, [id, qty]) => {
+                  const p = products.find((prod) => prod.id === Number(id));
+                  return sum + (p ? p.price * qty : 0);
+                }, 0);
+                const disc = parseFloat(manualDiscount) || 0;
+                const finalTotal = Math.max(0, sessionCost + beverageCost - disc);
+
+                return (
+                  <div className="p-3.5 rounded-xl bg-surface/90 border border-border space-y-1 text-xs">
+                    <div className="flex justify-between text-slate-400">
+                      <span>حساب الوقت ({dur} دقيقة):</span>
+                      <span className="font-mono text-white" dir="ltr">{formatMoney(sessionCost)} {t.currency}</span>
+                    </div>
+                    {beverageCost > 0 && (
+                      <div className="flex justify-between text-slate-400">
+                        <span>المشاريب والضيافة:</span>
+                        <span className="font-mono text-amber-400" dir="ltr">+{formatMoney(beverageCost)} {t.currency}</span>
+                      </div>
+                    )}
+                    {disc > 0 && (
+                      <div className="flex justify-between text-rose-400">
+                        <span>الخصم:</span>
+                        <span className="font-mono" dir="ltr">-{formatMoney(disc)} {t.currency}</span>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-border flex justify-between items-center text-sm font-black text-white">
+                      <span>الإجمالي المطلوب:</span>
+                      <span className="font-mono text-emerald-400 text-base" dir="ltr">
+                        {formatMoney(finalTotal)} {t.currency}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setManualModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-surface border border-border text-slate-300 hover:bg-card"
+                >
+                  {t.close}
+                </button>
+                <button
+                  type="submit"
+                  disabled={manualLoading}
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-neon-purple transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  <span>{manualLoading ? 'جاري التسجيل...' : 'حفظ وإدخال في الخزنة'}</span>
                 </button>
               </div>
             </form>

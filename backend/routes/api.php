@@ -58,12 +58,17 @@ $apiRoutes = function () {
         Route::post('/sessions/{id}/add-beverage', [SessionController::class, 'addBeverage']);
         Route::post('/sessions/{id}/end', [SessionController::class, 'end']);
         Route::patch('/sessions/{id}/end-session', [SessionController::class, 'end']);
+        Route::post('/sessions/manual', [SessionController::class, 'addManualSession']);
         Route::get('/orders', [OrderController::class, 'index']);
         Route::post('/orders', [OrderController::class, 'store']);
         Route::post('/orders/create', [OrderController::class, 'store']);
         Route::post('/orders/{id}/payment', [OrderController::class, 'processPayment']);
         Route::post('/orders/{id}/process-payment', [OrderController::class, 'processPayment']);
         Route::get('/orders/{id}/receipt', [OrderController::class, 'receipt']);
+        Route::patch('/order-items/{id}', [OrderController::class, 'updateItem']);
+        Route::post('/order-items/{id}/update-quantity', [OrderController::class, 'updateItem']);
+        Route::delete('/order-items/{id}', [OrderController::class, 'destroyItem']);
+        Route::post('/order-items/{id}/delete', [OrderController::class, 'destroyItem']);
         Route::get('/tables', [TableController::class, 'index']);
         Route::post('/tables', [TableController::class, 'store']);
         Route::patch('/tables/{id}', [TableController::class, 'update']);
