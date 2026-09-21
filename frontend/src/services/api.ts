@@ -1,4 +1,4 @@
-﻿import {
+import {
   Device,
   NotificationItem,
   Order,
@@ -385,17 +385,46 @@ class ApiService {
     }
   }
 
-  async releaseTable(tableId: number, payment_method: string = 'cash') {
-    if (isStandalone) return mockStore.releaseTable(tableId, payment_method);
+  async addItemsToTable(tableId: number, items: { product_id: number; quantity: number; notes?: string }[]) {
+    if (isStandalone) return mockStore.addBeverageToTable(tableId, items);
     try {
-      return await this.request(`/tables/${tableId}/release`, {
+      return await this.request<{ message: string; table: Table; order: Order }>(`/tables/${tableId}/add-items`, {
         method: 'POST',
-        body: JSON.stringify({ payment_method }),
+        body: JSON.stringify({ items }),
       });
     } catch (error) {
-      if (isLocalhost) return mockStore.releaseTable(tableId, payment_method);
+      if (isLocalhost) return mockStore.addBeverageToTable(tableId, items);
       throw error;
     }
+  }
+
+  async checkoutTable(tableId: number, data: {
+    payment_method?: string;
+    discount?: number;
+    amount_paid?: number;
+    customer_name?: string;
+    customer_phone?: string;
+  }): Promise<{ message: string; table: Table; receipt?: ThermalReceipt }> {
+    if (isStandalone) {
+      const res = mockStore.releaseTable(tableId, data.payment_method || 'cash');
+      return { message: res.message, table: (mockStore as any).data.tables.find((t: any) => t.id === tableId) };
+    }
+    try {
+      return await this.request<{ message: string; table: Table; receipt?: ThermalReceipt }>(`/tables/${tableId}/checkout`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      if (isLocalhost) {
+        const res = mockStore.releaseTable(tableId, data.payment_method || 'cash');
+        return { message: res.message, table: (mockStore as any).data.tables.find((t: any) => t.id === tableId) };
+      }
+      throw error;
+    }
+  }
+
+  async releaseTable(tableId: number, payment_method: string = 'cash') {
+    return this.checkoutTable(tableId, { payment_method });
   }
 
   // --- Products & Inventory ---

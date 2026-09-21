@@ -71,6 +71,8 @@ $apiRoutes = function () {
         Route::get('/tables/{id}', [TableController::class, 'show']);
         Route::patch('/tables/{id}/occupy', [TableController::class, 'occupy']);
         Route::post('/tables/{id}/move-to-gaming', [TableController::class, 'moveToGaming']);
+        Route::post('/tables/{id}/add-items', [TableController::class, 'addItems']);
+        Route::post('/tables/{id}/checkout', [TableController::class, 'release']);
         Route::post('/tables/{id}/release', [TableController::class, 'release']);
         Route::patch('/tables/{id}/release', [TableController::class, 'release']);
         Route::get('/products', [ProductController::class, 'index']);

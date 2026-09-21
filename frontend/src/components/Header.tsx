@@ -152,10 +152,17 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
               <div className="h-4 w-px bg-border" />
               <div className="flex items-center gap-1.5">
-                <DollarSign className="w-4 h-4 text-amber-400" />
+                <DollarSign className="w-4 h-4 text-purple-400" />
                 <span className="text-slate-400 text-xs">{t.shiftRevenue}:</span>
-                <span className="font-bold text-amber-300 font-mono" dir="ltr">
+                <span className="font-bold text-white font-mono" dir="ltr">
                   {formatMoney(metrics?.total_revenue)} {t.currency}
+                </span>
+              </div>
+              <div className="h-4 w-px bg-border" />
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/40">
+                <span className="text-xs text-emerald-400 font-bold">{lang === 'ar' ? 'الخزينة (الكاش):' : 'Drawer Cash:'}</span>
+                <span className="font-mono font-black text-emerald-300" dir="ltr">
+                  {formatMoney(metrics?.cash_in_drawer ?? metrics?.cash_collected)} {t.currency}
                 </span>
               </div>
               <div className="h-4 w-px bg-border" />

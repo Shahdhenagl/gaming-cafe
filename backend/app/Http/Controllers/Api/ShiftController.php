@@ -77,13 +77,20 @@ class ShiftController extends Controller
         $beverageProfit = (float) $totalOrderRevenue - $beverageCost;
         $gamingProfit = (float) $totalSessionRevenue;
 
-        $cashRevenue = $orders->where('payment_method', 'cash')->sum('total_amount')
-            + $sessions->where('payment_method', 'cash')->sum(fn ($session) => $this->sessionRevenue($session));
-        $cashExpenses = $expenses->where('payment_method', 'cash')->sum('amount');
+        $ordersCash = (float) $orders->where('payment_method', 'cash')->where('payment_status', 'paid')->sum('total_amount');
+        $sessionsCash = (float) $sessions->where('payment_method', 'cash')->where('payment_status', 'paid')->sum(fn ($session) => $this->sessionRevenue($session));
+        $debtCash = (float) Payment::where('shift_id', $shift->id)
+            ->whereNull('order_id')
+            ->whereNull('device_session_id')
+            ->where('payment_method', 'cash')
+            ->where('status', 'confirmed')
+            ->sum('amount');
+        $cashRevenue = $ordersCash + $sessionsCash + $debtCash;
+        $cashExpenses = (float) $expenses->where('payment_method', 'cash')->sum('amount');
         $cashTotal = max(0, $cashRevenue - $cashExpenses);
 
-        $cardTotal = $orders->where('payment_method', 'visa')->sum('total_amount')
-            + $sessions->where('payment_method', 'visa')->sum(fn ($session) => $this->sessionRevenue($session));
+        $cardTotal = (float) $orders->where('payment_method', 'visa')->where('payment_status', 'paid')->sum('total_amount')
+            + (float) $sessions->where('payment_method', 'visa')->where('payment_status', 'paid')->sum(fn ($session) => $this->sessionRevenue($session));
 
         $totalBeveragesCount = $orders->sum(fn ($order) => $order->items->sum('quantity'));
 
@@ -107,6 +114,7 @@ class ShiftController extends Controller
                 'total_beverages_sold' => $totalBeveragesCount,
                 'total_revenue' => round($totalRevenue, 2),
                 'cash_collected' => round($cashTotal, 2),
+                'cash_in_drawer' => round($cashTotal, 2),
                 'cash_revenue' => round($cashRevenue, 2),
                 'cash_expenses' => round($cashExpenses, 2),
                 'expenses_total' => round($expenses->sum('amount'), 2),
@@ -195,12 +203,19 @@ class ShiftController extends Controller
         $totalRevenue = $orders->sum('total_amount') + $totalGamingRevenue;
         $beverageCost = (float) $orders->sum(fn ($order) => $order->items->sum(fn ($item) => $item->quantity * (float) $item->cost_price));
         $netProfit = (float) $totalRevenue - $beverageCost - (float) $expenses->sum('amount');
-        $cashRevenue = $orders->where('payment_method', 'cash')->sum('total_amount')
-            + $sessions->where('payment_method', 'cash')->sum(fn ($session) => $this->sessionRevenue($session));
-        $cashExpenses = $expenses->where('payment_method', 'cash')->sum('amount');
+        $ordersCash = (float) $orders->where('payment_method', 'cash')->where('payment_status', 'paid')->sum('total_amount');
+        $sessionsCash = (float) $sessions->where('payment_method', 'cash')->where('payment_status', 'paid')->sum(fn ($session) => $this->sessionRevenue($session));
+        $debtCash = (float) Payment::where('shift_id', $shift->id)
+            ->whereNull('order_id')
+            ->whereNull('device_session_id')
+            ->where('payment_method', 'cash')
+            ->where('status', 'confirmed')
+            ->sum('amount');
+        $cashRevenue = $ordersCash + $sessionsCash + $debtCash;
+        $cashExpenses = (float) $expenses->where('payment_method', 'cash')->sum('amount');
         $cashTotal = max(0, $cashRevenue - $cashExpenses);
-        $cardTotal = $orders->where('payment_method', 'visa')->sum('total_amount')
-            + $sessions->where('payment_method', 'visa')->sum(fn ($session) => $this->sessionRevenue($session));
+        $cardTotal = (float) $orders->where('payment_method', 'visa')->where('payment_status', 'paid')->sum('total_amount')
+            + (float) $sessions->where('payment_method', 'visa')->where('payment_status', 'paid')->sum(fn ($session) => $this->sessionRevenue($session));
 
         $deductions = $request->deductions ?? 0.00;
         $totalAfterDeductions = max(0, $totalRevenue - $deductions);

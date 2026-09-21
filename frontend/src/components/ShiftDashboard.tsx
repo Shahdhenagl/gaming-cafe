@@ -182,7 +182,10 @@ export const ShiftDashboard: React.FC<ShiftDashboardProps> = ({
             <div>
               <p className="text-xs text-slate-400 uppercase font-semibold">{t.cashInDrawer}</p>
               <p className="text-xl font-mono font-black text-amber-300" dir="ltr">
-                {formatMoney(metrics?.cash_collected)} {t.currency}
+                {formatMoney(metrics?.cash_in_drawer ?? metrics?.cash_collected)} {t.currency}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {formatMoney(metrics?.cash_revenue)} مقبوضات - {formatMoney(metrics?.cash_expenses)} مصروفات
               </p>
             </div>
           </div>

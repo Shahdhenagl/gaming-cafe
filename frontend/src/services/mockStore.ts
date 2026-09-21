@@ -1,4 +1,4 @@
-﻿import {
+import {
   Device,
   NotificationItem,
   Order,
@@ -752,6 +752,47 @@ class MockStore {
       this.save();
     }
     return { message: 'تم شغل الطاولة بنجاح' };
+  }
+
+  addBeverageToTable(tableId: number, items: { product_id: number; quantity: number; notes?: string }[]) {
+    const tbl = this.data.tables.find((t) => t.id === tableId);
+    if (!tbl) throw new Error('الطاولة غير موجودة');
+    tbl.status = 'occupied';
+    let addedTotal = 0;
+    const orderItems = items.map((it) => {
+      const prod = this.data.products.find((p) => p.id === it.product_id);
+      const price = prod?.price || 20;
+      addedTotal += price * it.quantity;
+      if (prod) prod.stock_quantity = Math.max(0, prod.stock_quantity - it.quantity);
+      return {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        name: prod?.name || 'صنف',
+        name_ar: prod?.name_ar || prod?.name || 'صنف',
+        quantity: it.quantity,
+        unit_price: price,
+        subtotal: price * it.quantity,
+      };
+    });
+    if (!tbl.order) {
+      tbl.order = {
+        id: Date.now(),
+        order_number: 'ORD-T' + Math.floor(100 + Math.random() * 900),
+        created_at: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+        subtotal: addedTotal,
+        discount: 0,
+        total_amount: addedTotal,
+        items_count: items.length,
+        items: orderItems,
+      };
+    } else {
+      tbl.order.items = [...tbl.order.items, ...orderItems];
+      tbl.order.subtotal += addedTotal;
+      tbl.order.total_amount += addedTotal;
+      tbl.order.items_count = tbl.order.items.length;
+    }
+    tbl.total_spent = tbl.order.total_amount;
+    this.save();
+    return { message: 'تمت إضافة الأصناف لحساب الطاولة بنجاح', table: tbl };
   }
 
   releaseTable(tableId: number, payment_method: string = 'cash') {

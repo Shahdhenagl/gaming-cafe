@@ -300,7 +300,7 @@ class SessionController extends Controller
             if ($paymentMethod === 'credit' && $customer) {
                 CustomerDebt::create(['customer_id' => $customer->id, 'device_session_id' => $session->id, 'shift_id' => $session->shift_id, 'amount' => $finalTotal, 'description' => 'جلسة ألعاب ' . $session->device->device_name]);
             } else {
-                Payment::create(['device_session_id' => $session->id, 'amount' => $amountPaid, 'payment_method' => $paymentMethod, 'status' => 'confirmed']);
+                Payment::create(['device_session_id' => $session->id, 'shift_id' => $session->shift_id, 'amount' => $amountPaid, 'payment_method' => $paymentMethod, 'status' => 'confirmed']);
             }
         });
 

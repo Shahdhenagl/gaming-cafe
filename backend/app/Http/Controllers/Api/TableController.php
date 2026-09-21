@@ -3,10 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Customer;
+use App\Models\CustomerDebt;
 use App\Models\Device;
 use App\Models\DeviceSession;
+use App\Models\InventoryLog;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Payment;
+use App\Models\Product;
+use App\Models\Shift;
 use App\Models\Table;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -180,27 +186,148 @@ class TableController extends Controller
     }
 
     /**
-     * Release table / Settle payment.
+     * Add beverage / snack items directly to the table's open tab.
+     */
+    public function addItems(Request $request, $id)
+    {
+        $table = Table::with('currentOrder.items')->findOrFail($id);
+
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.notes' => 'nullable|string',
+        ]);
+
+        $shift = Shift::where('status', 'active')->latest()->first();
+
+        $result = DB::transaction(function () use ($table, $shift, $request) {
+            $totalAddedPrice = 0.0;
+
+            // Check if table currently has an unpaid open order
+            $order = $table->currentOrder;
+            if (!$order || $order->payment_status === 'paid' || $order->status === 'cancelled') {
+                $order = Order::create([
+                    'order_number' => 'ORD-T' . strtoupper(bin2hex(random_bytes(2))),
+                    'shift_id' => $shift ? $shift->id : null,
+                    'staff_id' => $request->user() ? $request->user()->id : null,
+                    'status' => 'completed',
+                    'order_type' => 'dine_in',
+                    'table_id' => $table->id,
+                    'subtotal' => 0,
+                    'total_amount' => 0,
+                    'payment_status' => 'unpaid',
+                    'payment_method' => 'cash',
+                ]);
+            }
+
+            foreach ($request->items as $item) {
+                $product = Product::findOrFail($item['product_id']);
+                $qty = (int)$item['quantity'];
+                $subtotal = round($product->price * $qty, 2);
+                $totalAddedPrice += $subtotal;
+
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => $product->id,
+                    'quantity' => $qty,
+                    'unit_price' => $product->price,
+                    'cost_price' => $product->cost_price ?? 0,
+                    'subtotal' => $subtotal,
+                    'notes' => $item['notes'] ?? null,
+                ]);
+
+                // Deduct stock & log
+                $product->decrement('stock_quantity', $qty);
+                InventoryLog::create([
+                    'product_id' => $product->id,
+                    'quantity_change' => -$qty,
+                    'reason' => 'sale',
+                    'staff_id' => $request->user() ? $request->user()->id : null,
+                ]);
+            }
+
+            $newSubtotal = (float)$order->subtotal + $totalAddedPrice;
+            $newTotal = max(0, $newSubtotal - (float)$order->discount);
+
+            $order->update([
+                'subtotal' => $newSubtotal,
+                'total_amount' => $newTotal,
+            ]);
+
+            $table->update([
+                'status' => 'occupied',
+                'occupied_at' => $table->occupied_at ?: Carbon::now(),
+                'current_order_id' => $order->id,
+                'total_spent' => $newTotal,
+            ]);
+
+            return ['order' => $order, 'table' => $table];
+        });
+
+        return response()->json([
+            'message' => 'تمت إضافة الأصناف إلى حساب الطاولة بنجاح',
+            'table' => $table->fresh(['currentOrder.items.product']),
+            'order' => $result['order']->load('items.product'),
+        ]);
+    }
+
+    /**
+     * Release table / Settle payment and print thermal receipt.
      */
     public function release(Request $request, $id)
     {
-        $table = Table::with('currentOrder')->findOrFail($id);
+        $table = Table::with(['currentOrder.items.product'])->findOrFail($id);
+
+        $request->validate([
+            'payment_method' => 'nullable|in:cash,visa,wallet,instapay,installment,credit,other',
+            'discount' => 'nullable|numeric|min:0',
+            'amount_paid' => 'nullable|numeric|min:0',
+            'customer_name' => 'required_if:payment_method,credit|string|max:255',
+            'customer_phone' => 'required_if:payment_method,credit|string|max:40',
+        ]);
 
         $paymentMethod = $request->input('payment_method', 'cash');
+        $shift = Shift::where('status', 'active')->latest()->first();
 
-        DB::transaction(function () use ($table, $paymentMethod) {
-            if ($table->currentOrder) {
-                $table->currentOrder->update([
-                    'payment_status' => 'paid',
+        $order = $table->currentOrder;
+        $subtotal = $order ? (float)$order->subtotal : (float)$table->total_spent;
+        $discount = $request->filled('discount') ? (float)$request->discount : ($order ? (float)$order->discount : 0);
+        $finalTotal = max(0, $subtotal - $discount);
+        $amountPaid = $request->filled('amount_paid') ? (float)$request->amount_paid : $finalTotal;
+
+        DB::transaction(function () use ($table, $order, $shift, $paymentMethod, $discount, $finalTotal, $amountPaid, $request) {
+            $customer = $paymentMethod === 'credit'
+                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name])
+                : null;
+
+            if ($order) {
+                $order->update([
+                    'discount' => $discount,
+                    'total_amount' => $finalTotal,
+                    'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
                     'payment_method' => $paymentMethod,
+                    'status' => 'completed',
+                    ...($customer ? ['customer_id' => $customer->id] : []),
                 ]);
 
-                Payment::create([
-                    'order_id' => $table->currentOrder->id,
-                    'amount' => $table->currentOrder->total_amount,
-                    'payment_method' => $paymentMethod,
-                    'status' => 'confirmed',
-                ]);
+                if ($paymentMethod === 'credit' && $customer) {
+                    CustomerDebt::create([
+                        'customer_id' => $customer->id,
+                        'order_id' => $order->id,
+                        'shift_id' => $shift?->id,
+                        'amount' => $finalTotal,
+                        'description' => 'حساب طاولة ' . $table->table_number,
+                    ]);
+                } else if ($finalTotal > 0) {
+                    Payment::create([
+                        'order_id' => $order->id,
+                        'shift_id' => $shift?->id,
+                        'amount' => $amountPaid,
+                        'payment_method' => $paymentMethod,
+                        'status' => 'confirmed',
+                    ]);
+                }
             }
 
             $table->update([
@@ -211,9 +338,37 @@ class TableController extends Controller
             ]);
         });
 
+        $receiptItems = $order?->items?->map(fn ($item) => [
+            'name' => $item->product?->name ?? 'صنف',
+            'name_ar' => $item->product?->name_ar ?? $item->product?->name ?? 'صنف',
+            'quantity' => (int)$item->quantity,
+            'unit_price' => (float)$item->unit_price,
+            'subtotal' => (float)$item->subtotal,
+        ])->values()->all() ?? [];
+
         return response()->json([
-            'message' => 'Table order paid and table released successfully',
+            'message' => 'تم تسوية حساب الطاولة وإتاحتها بنجاح',
             'table' => $table->fresh(),
+            'receipt' => [
+                'business_name' => 'AL5AL Gaming & Billiards Lounge',
+                'business_name_ar' => 'صالة الخال للألعاب والبلياردو والكافيه',
+                'slogan' => 'Enjoy The Game - استمتع بأفضل تجربة لعب وتحدي',
+                'phones' => '01032890430 (Karim) / 01289535503 (Al-Ghareeb) / 0502943796',
+                'order_number' => $order?->order_number ?? ('TBL-' . $table->id),
+                'date_time' => Carbon::now()->format('Y-m-d H:i'),
+                'staff_name' => $request->user()?->name ?? 'كاشير الصالة',
+                'order_type' => 'dine_in',
+                'table_number' => $table->table_number,
+                'subtotal' => (float)$subtotal,
+                'discount' => (float)$discount,
+                'tax' => 0,
+                'total_amount' => (float)$finalTotal,
+                'payment_method' => $paymentMethod,
+                'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
+                'items' => $receiptItems,
+                'footer_note' => 'Thank you for visiting AL5AL! Enjoy The Game',
+                'footer_note_ar' => 'شكراً لزيارتكم صالة الخال! نتمنى لكم وقتاً ممتعاً',
+            ],
         ]);
     }
 }

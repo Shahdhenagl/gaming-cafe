@@ -88,6 +88,11 @@ export const EndShiftModal: React.FC<EndShiftModalProps> = ({
               <span className="text-sm font-bold text-amber-300 font-mono" dir="ltr">
                 {formatMoney(expectedCash)} {t.currency}
               </span>
+              {Boolean(metrics?.cash_expenses) && (
+                <span className="text-[9px] text-rose-300 block mt-0.5">
+                  بعد خصم {formatMoney(metrics?.cash_expenses)} مصروفات
+                </span>
+              )}
             </div>
             <div className="p-3 rounded-xl bg-surface border border-border text-center">
               <span className="text-[10px] uppercase text-slate-400 font-bold block">

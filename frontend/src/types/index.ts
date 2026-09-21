@@ -45,6 +45,9 @@ export interface ShiftMetrics {
   beverage_profit?: number;
   expenses_total?: number;
   net_profit?: number;
+  cash_in_drawer?: number;
+  cash_revenue?: number;
+  cash_expenses?: number;
 }
 
 export type DeviceType = 'ps5' | 'ps4' | 'billiards' | 'pingpong' | 'pc' | 'xbox' | 'sim' | 'other';

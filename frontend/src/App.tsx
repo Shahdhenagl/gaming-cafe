@@ -267,8 +267,19 @@ export function App() {
     void refreshOperationalData();
   };
 
-  const handleReleaseTable = async (tableId: number, paymentMethod: string) => {
-    await api.releaseTable(tableId, paymentMethod);
+  const handleCheckoutTable = async (
+    tableId: number,
+    data: { payment_method: string; discount?: number; amount_paid?: number; customer_name?: string; customer_phone?: string }
+  ) => {
+    const res = await api.checkoutTable(tableId, data);
+    void refreshOperationalData();
+    if (res && res.receipt) {
+      setReceiptModalData(res.receipt);
+    }
+  };
+
+  const handleAddItemsToTable = async (tableId: number, items: { product_id: number; quantity: number }[]) => {
+    await api.addItemsToTable(tableId, items);
     void refreshOperationalData();
   };
 
@@ -382,9 +393,12 @@ export function App() {
                 lang={lang}
                 tables={tables}
                 devices={devices}
+                products={products}
                 onOccupyTable={handleOccupyTable}
                 onMoveTableToGaming={handleMoveTableToGaming}
-                onReleaseTable={handleReleaseTable}
+                onCheckoutTable={handleCheckoutTable}
+                onAddItemsToTable={handleAddItemsToTable}
+                onShowReceipt={(receipt) => setReceiptModalData(receipt)}
                 onRefresh={loadInitialData}
               />
             )}

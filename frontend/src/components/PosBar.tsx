@@ -20,6 +20,7 @@ import { Device, Order, OrderType, PaymentMethod, Product, Table, ThermalReceipt
 import { Language, translations } from '../i18n/translations';
 import { sounds } from '../utils/audio';
 import { formatMoney } from '../utils/format';
+import { api } from '../services/api';
 
 interface PosBarProps {
   lang: Language;
@@ -148,6 +149,27 @@ export const PosBar: React.FC<PosBarProps> = ({
     setCart({});
     setDiscount('0');
     setOrderNotes('');
+  };
+
+  const handleAddToTableTab = async () => {
+    if (cartItems.length === 0 || !selectedTableId) return;
+    setLoading(true);
+    setCheckoutError('');
+    try {
+      await api.addItemsToTable(
+        selectedTableId,
+        cartItems.map((ci) => ({
+          product_id: ci.product.id,
+          quantity: ci.quantity,
+        }))
+      );
+      sounds.playCashRegister();
+      clearCart();
+    } catch (error: any) {
+      setCheckoutError(error?.message || 'تعذر إضافة الطلب إلى حساب الطاولة');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOpenCheckout = () => {
@@ -478,15 +500,44 @@ export const PosBar: React.FC<PosBarProps> = ({
           </div>
         </div>
 
-        {/* Checkout Button */}
-        <button
-          onClick={handleOpenCheckout}
-          disabled={cartItems.length === 0}
-          className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-sm shadow-neon-amber transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none"
-        >
-          <DollarSign className="w-4 h-4" />
-          <span>{t.checkout}</span>
-        </button>
+        {/* Checkout Button / Add to Table Tab */}
+        {checkoutError && (
+          <p className="mt-2 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30 p-2 rounded-xl text-center">
+            {checkoutError}
+          </p>
+        )}
+
+        {orderType === 'dine_in' ? (
+          <div className="space-y-2 mt-4">
+            <button
+              type="button"
+              onClick={handleAddToTableTab}
+              disabled={cartItems.length === 0 || !selectedTableId || loading}
+              className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-neon-purple transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <Coffee className="w-4 h-4" />
+              <span>{loading ? 'جاري الإضافة...' : 'إضافة لحساب الطاولة (بدون دفع الآن)'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenCheckout}
+              disabled={cartItems.length === 0 || !selectedTableId}
+              className="w-full py-2.5 rounded-xl bg-surface border border-border hover:border-amber-500 text-slate-300 hover:text-white font-bold text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+              <span>دفع فوري للطاولة الآن</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleOpenCheckout}
+            disabled={cartItems.length === 0}
+            className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-sm shadow-neon-amber transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none"
+          >
+            <DollarSign className="w-4 h-4" />
+            <span>{t.checkout}</span>
+          </button>
+        )}
       </div>
 
       {/* --- PAYMENT & CHECKOUT MODAL --- */}
