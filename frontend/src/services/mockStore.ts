@@ -437,6 +437,10 @@ class MockStore {
       total_beverages_sold: 14,
       total_revenue: shift ? shift.total_after_deductions : 0,
       cash_collected: shift ? shift.cash_collected : 0,
+      cash_in_drawer: shift ? shift.cash_collected : 0,
+      cash_revenue: shift ? shift.cash_collected : 0,
+      cash_expenses: 0,
+      expenses_total: 0,
       card_collected: shift ? shift.card_collected : 0,
       average_order_value: 48.50,
     };
