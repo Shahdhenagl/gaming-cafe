@@ -81,12 +81,13 @@ return [
 
         'pgsql' => [
             'driver' => 'pgsql',
-            // Vercel cannot reach Supabase's direct IPv6 host; use the regional IPv4 pooler.
+            // Prefer Vercel's explicit variables. Supabase Session Pooler uses port 6543;
+            // the DB_POOLER_* names remain as backwards-compatible fallbacks.
             'url' => null,
-            'host' => env('DB_POOLER_HOST', 'aws-1-eu-west-1.pooler.supabase.com'),
-            'port' => env('DB_POOLER_PORT', '5432'),
+            'host' => env('DB_HOST', env('DB_POOLER_HOST', 'aws-1-eu-west-1.pooler.supabase.com')),
+            'port' => env('DB_PORT', env('DB_POOLER_PORT', '6543')),
             'database' => env('DB_DATABASE', 'postgres'),
-            'username' => env('DB_POOLER_USERNAME', 'postgres.zgnfbpvpglptgkqpdhud'),
+            'username' => env('DB_USERNAME', env('DB_POOLER_USERNAME', 'postgres.zgnfbpvpglptgkqpdhud')),
             'password' => env('DB_PASSWORD', ''),
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
