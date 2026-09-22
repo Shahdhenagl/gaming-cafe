@@ -16,7 +16,8 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    // Production must never silently fall back to the bundled empty SQLite file.
+    'default' => env('DB_CONNECTION', env('APP_ENV', 'production') === 'production' ? 'pgsql' : 'sqlite'),
 
     /*
     |--------------------------------------------------------------------------
@@ -84,10 +85,12 @@ return [
             // Prefer Vercel's explicit variables. Supabase Session Pooler uses port 6543;
             // the DB_POOLER_* names remain as backwards-compatible fallbacks.
             'url' => null,
-            'host' => env('DB_HOST', env('DB_POOLER_HOST', 'aws-1-eu-west-1.pooler.supabase.com')),
-            'port' => env('DB_PORT', env('DB_POOLER_PORT', '6543')),
+            // Deliberately prefer the known Supabase Session Pooler endpoint over
+            // stale DB_HOST/DB_PORT values that may still point at direct 5432.
+            'host' => 'aws-1-eu-west-1.pooler.supabase.com',
+            'port' => '6543',
             'database' => env('DB_DATABASE', 'postgres'),
-            'username' => env('DB_USERNAME', env('DB_POOLER_USERNAME', 'postgres.zgnfbpvpglptgkqpdhud')),
+            'username' => 'postgres.zgnfbpvpglptgkqpdhud',
             'password' => env('DB_PASSWORD', ''),
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
