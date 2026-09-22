@@ -32,18 +32,25 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
   const t = translations[lang];
 
-  // Helper date strings
-  const getTodayStr = () => new Date().toISOString().slice(0, 10);
+  // Use the cashier's local calendar day; ISO strings are UTC and can shift the report
+  // to yesterday after midnight in Egypt and other positive-offset timezones.
+  const getLocalDate = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const getTodayStr = () => getLocalDate();
   const getYesterdayStr = () => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toISOString().slice(0, 10);
+    return getLocalDate(d);
   };
-  const getCurrentMonthStr = () => new Date().toISOString().slice(0, 7);
+  const getCurrentMonthStr = () => getTodayStr().slice(0, 7);
   const getLastMonthStr = () => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
-    return d.toISOString().slice(0, 7);
+    return getLocalDate(d).slice(0, 7);
   };
 
   // Filter state
@@ -493,7 +500,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
             {[
               { id: 'all', label: 'الكل' },
               { id: 'cash', label: 'نقدي (الدرج)' },
-              { id: 'card', label: 'فيزا / إلكتروني' },
+              { id: 'visa', label: 'فيزا / بطاقة' },
+              { id: 'wallet', label: 'محفظة' },
+              { id: 'instapay', label: 'إنستا باي' },
+              { id: 'installment', label: 'تقسيط' },
+              { id: 'credit', label: 'آجل' },
+              { id: 'other', label: 'أخرى' },
             ].map((p) => (
               <button
                 key={p.id}
@@ -949,4 +961,3 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
     </div>
   );
 };
-

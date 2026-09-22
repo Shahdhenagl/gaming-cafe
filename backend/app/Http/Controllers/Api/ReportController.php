@@ -222,38 +222,50 @@ class ReportController extends Controller
      */
     public function statement(Request $request)
     {
+        $businessTimezone = (string) env('BUSINESS_TIMEZONE', 'Africa/Cairo');
         if ($request->filled('date')) {
-            $startDate = Carbon::parse($request->date)->startOfDay();
-            $endDate = Carbon::parse($request->date)->endOfDay();
+            $startDate = Carbon::parse($request->date, $businessTimezone)->startOfDay();
+            $endDate = Carbon::parse($request->date, $businessTimezone)->endOfDay();
             $periodLabel = 'يوم ' . $startDate->format('Y-m-d');
             $periodType = 'day';
         } elseif ($request->filled('month')) {
-            $startDate = Carbon::parse($request->month . '-01')->startOfMonth();
+            $startDate = Carbon::parse($request->month . '-01', $businessTimezone)->startOfMonth();
             $endDate = (clone $startDate)->endOfMonth();
             $periodLabel = 'شهر ' . $startDate->format('Y-m');
             $periodType = 'month';
         } elseif ($request->filled('from_date') && $request->filled('to_date')) {
-            $startDate = Carbon::parse($request->from_date)->startOfDay();
-            $endDate = Carbon::parse($request->to_date)->endOfDay();
+            $startDate = Carbon::parse($request->from_date, $businessTimezone)->startOfDay();
+            $endDate = Carbon::parse($request->to_date, $businessTimezone)->endOfDay();
             $periodLabel = 'الفترة من ' . $startDate->format('Y-m-d') . ' إلى ' . $endDate->format('Y-m-d');
             $periodType = 'range';
         } else {
-            $startDate = Carbon::today()->startOfDay();
-            $endDate = Carbon::today()->endOfDay();
+            $startDate = Carbon::now($businessTimezone)->startOfDay();
+            $endDate = Carbon::now($businessTimezone)->endOfDay();
             $periodLabel = 'اليوم ' . $startDate->format('Y-m-d');
             $periodType = 'today';
         }
 
         $search = trim((string)$request->input('search', ''));
-        $typeFilter = $request->input('type', 'all'); // all, gaming, cafe, expense, debt, cash
+        $typeFilter = $request->input('type', 'all'); // all, gaming, cafe, expense, debt_payment, cash
         $paymentFilter = $request->input('payment_method', 'all');
+        $queryStartDate = $startDate->copy()->setTimezone('UTC');
+        $queryEndDate = $endDate->copy()->setTimezone('UTC');
+        $paymentLabels = [
+            'cash' => 'نقدي (الدرج)',
+            'visa' => 'فيزا / بطاقة بنكية',
+            'wallet' => 'محفظة إلكترونية',
+            'instapay' => 'إنستا باي',
+            'installment' => 'تقسيط',
+            'credit' => 'آجل',
+            'other' => 'أخرى',
+        ];
 
         $transactions = collect();
 
         // 1. Gaming Sessions
         if (in_array($typeFilter, ['all', 'gaming', 'cash'])) {
             $sessionsQuery = DeviceSession::with(['device', 'staff', 'orders.items.product'])
-                ->whereBetween('created_at', [$startDate, $endDate])
+                ->whereBetween('created_at', [$queryStartDate, $queryEndDate])
                 ->where('status', '!=', 'cancelled');
 
             if ($paymentFilter !== 'all') {
@@ -314,7 +326,7 @@ class ReportController extends Controller
                     'details' => implode(' • ', $detailParts),
                     'items_summary' => $beverageSummary,
                     'payment_method' => $session->payment_method ?? 'cash',
-                    'payment_method_label' => ($session->payment_method === 'cash' || empty($session->payment_method)) ? 'نقدي (الدرج)' : 'إلكتروني / أخرى',
+                    'payment_method_label' => $paymentLabels[$session->payment_method ?? 'cash'] ?? 'أخرى',
                     'payment_status' => $session->payment_status,
                     'is_cash' => $isCash,
                     'amount_in' => $isPaid ? $total : 0.0,
@@ -330,7 +342,7 @@ class ReportController extends Controller
         if (in_array($typeFilter, ['all', 'cafe', 'cash'])) {
             $ordersQuery = Order::with(['items.product', 'table', 'customer', 'staff'])
                 ->whereNull('device_session_id')
-                ->whereBetween('created_at', [$startDate, $endDate])
+                ->whereBetween('created_at', [$queryStartDate, $queryEndDate])
                 ->where('status', '!=', 'cancelled');
 
             if ($paymentFilter !== 'all') {
@@ -372,7 +384,7 @@ class ReportController extends Controller
                     'details' => $itemsSummary ?: 'مشروبات / طلب كافيه',
                     'items_summary' => $itemsSummary,
                     'payment_method' => $ord->payment_method ?? 'cash',
-                    'payment_method_label' => ($ord->payment_method === 'cash' || empty($ord->payment_method)) ? 'نقدي (الدرج)' : 'إلكتروني / أخرى',
+                    'payment_method_label' => $paymentLabels[$ord->payment_method ?? 'cash'] ?? 'أخرى',
                     'payment_status' => $ord->payment_status,
                     'is_cash' => $isCash,
                     'amount_in' => $isPaid ? $total : 0.0,
@@ -386,9 +398,9 @@ class ReportController extends Controller
 
         // 3. Expenses (مسحوبات ومصروفات الخزنة والدرج)
         if (in_array($typeFilter, ['all', 'expense', 'cash'])) {
-            $expensesQuery = Expense::with('staff')
-                ->where(function ($q) use ($startDate, $endDate) {
-                    $q->whereBetween('created_at', [$startDate, $endDate])
+                $expensesQuery = Expense::with('staff')
+                ->where(function ($q) use ($startDate, $endDate, $queryStartDate, $queryEndDate) {
+                    $q->whereBetween('created_at', [$queryStartDate, $queryEndDate])
                       ->orWhereBetween('expense_date', [$startDate->toDateString(), $endDate->toDateString()]);
                 });
 
@@ -421,7 +433,7 @@ class ReportController extends Controller
                     'details' => 'بند: ' . $exp->category . ($exp->notes ? (' • ' . $exp->notes) : ''),
                     'items_summary' => null,
                     'payment_method' => $exp->payment_method ?? 'cash',
-                    'payment_method_label' => ($exp->payment_method === 'cash' || empty($exp->payment_method)) ? 'نقدي (الدرج)' : 'إلكتروني / أخرى',
+                    'payment_method_label' => $paymentLabels[$exp->payment_method ?? 'cash'] ?? 'أخرى',
                     'payment_status' => 'paid',
                     'is_cash' => $isCash,
                     'amount_in' => 0.0,
@@ -434,10 +446,10 @@ class ReportController extends Controller
         }
 
         // 4. Debt Collections (سداد حسابات الآجل)
-        if (in_array($typeFilter, ['all', 'debt', 'cash'])) {
+        if (in_array($typeFilter, ['all', 'debt_payment', 'cash'])) {
             if (Schema::hasTable('customer_debt_payments')) {
                 $debtPaymentsQuery = CustomerDebtPayment::with(['debt.customer', 'staff'])
-                    ->whereBetween('created_at', [$startDate, $endDate]);
+                    ->whereBetween('created_at', [$queryStartDate, $queryEndDate]);
 
                 if ($paymentFilter !== 'all') {
                     $debtPaymentsQuery->where('payment_method', $paymentFilter);
@@ -468,7 +480,7 @@ class ReportController extends Controller
                         'details' => 'سداد جزء/كامل مديونية سابقة' . ($dp->notes ? (' • ' . $dp->notes) : ''),
                         'items_summary' => null,
                         'payment_method' => $dp->payment_method ?? 'cash',
-                        'payment_method_label' => ($dp->payment_method === 'cash' || empty($dp->payment_method)) ? 'نقدي (الدرج)' : 'إلكتروني / أخرى',
+                        'payment_method_label' => $paymentLabels[$dp->payment_method ?? 'cash'] ?? 'أخرى',
                         'payment_status' => 'paid',
                         'is_cash' => $isCash,
                         'amount_in' => $amount,
@@ -510,7 +522,7 @@ class ReportController extends Controller
 
         $gamingRevenue = (float)$transactions->where('type', 'gaming')->sum('amount_in');
         $cafeRevenue = (float)$transactions->where('type', 'cafe')->sum('amount_in');
-        $debtCollected = (float)$transactions->where('type', 'debt')->sum('amount_in');
+        $debtCollected = (float)$transactions->where('type', 'debt_payment')->sum('amount_in');
 
         return response()->json([
             'period' => [
