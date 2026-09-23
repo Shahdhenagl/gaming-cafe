@@ -222,332 +222,402 @@ class ReportController extends Controller
      */
     public function statement(Request $request)
     {
-        $businessTimezone = (string) env('BUSINESS_TIMEZONE', 'Africa/Cairo');
-        if ($request->filled('date')) {
-            $startDate = Carbon::parse($request->date, $businessTimezone)->startOfDay();
-            $endDate = Carbon::parse($request->date, $businessTimezone)->endOfDay();
-            $periodLabel = 'يوم ' . $startDate->format('Y-m-d');
-            $periodType = 'day';
-        } elseif ($request->filled('month')) {
-            $startDate = Carbon::parse($request->month . '-01', $businessTimezone)->startOfMonth();
-            $endDate = (clone $startDate)->endOfMonth();
-            $periodLabel = 'شهر ' . $startDate->format('Y-m');
-            $periodType = 'month';
-        } elseif ($request->filled('from_date') && $request->filled('to_date')) {
-            $startDate = Carbon::parse($request->from_date, $businessTimezone)->startOfDay();
-            $endDate = Carbon::parse($request->to_date, $businessTimezone)->endOfDay();
-            $periodLabel = 'الفترة من ' . $startDate->format('Y-m-d') . ' إلى ' . $endDate->format('Y-m-d');
-            $periodType = 'range';
-        } else {
-            $startDate = Carbon::now($businessTimezone)->startOfDay();
-            $endDate = Carbon::now($businessTimezone)->endOfDay();
-            $periodLabel = 'اليوم ' . $startDate->format('Y-m-d');
-            $periodType = 'today';
-        }
-
-        $search = trim((string)$request->input('search', ''));
-        $typeFilter = $request->input('type', 'all'); // all, gaming, cafe, expense, debt_payment, cash
-        $paymentFilter = $request->input('payment_method', 'all');
-        $queryStartDate = $startDate->copy()->setTimezone('UTC');
-        $queryEndDate = $endDate->copy()->setTimezone('UTC');
-        $paymentLabels = [
-            'cash' => 'نقدي (الدرج)',
-            'visa' => 'فيزا / بطاقة بنكية',
-            'wallet' => 'محفظة إلكترونية',
-            'instapay' => 'إنستا باي',
-            'installment' => 'تقسيط',
-            'credit' => 'آجل',
-            'other' => 'أخرى',
-        ];
-
-        $transactions = collect();
-
-        // 1. Gaming Sessions
-        if (in_array($typeFilter, ['all', 'gaming', 'cash'])) {
-            $sessionsQuery = DeviceSession::with(['device', 'staff', 'orders.items.product'])
-                ->whereBetween('created_at', [$queryStartDate, $queryEndDate])
-                ->where('status', '!=', 'cancelled');
-
-            if ($paymentFilter !== 'all') {
-                $sessionsQuery->where('payment_method', $paymentFilter);
+        try {
+            $businessTimezone = (string) env('BUSINESS_TIMEZONE', 'Africa/Cairo');
+            if ($request->filled('date')) {
+                $startDate = Carbon::parse($request->date, $businessTimezone)->startOfDay();
+                $endDate = Carbon::parse($request->date, $businessTimezone)->endOfDay();
+                $periodLabel = 'يوم ' . $startDate->format('Y-m-d');
+                $periodType = 'day';
+            } elseif ($request->filled('month')) {
+                $startDate = Carbon::parse($request->month . '-01', $businessTimezone)->startOfMonth();
+                $endDate = (clone $startDate)->endOfMonth();
+                $periodLabel = 'شهر ' . $startDate->format('Y-m');
+                $periodType = 'month';
+            } elseif ($request->filled('from_date') && $request->filled('to_date')) {
+                $startDate = Carbon::parse($request->from_date, $businessTimezone)->startOfDay();
+                $endDate = Carbon::parse($request->to_date, $businessTimezone)->endOfDay();
+                $periodLabel = 'الفترة من ' . $startDate->format('Y-m-d') . ' إلى ' . $endDate->format('Y-m-d');
+                $periodType = 'range';
+            } else {
+                $startDate = Carbon::now($businessTimezone)->startOfDay();
+                $endDate = Carbon::now($businessTimezone)->endOfDay();
+                $periodLabel = 'اليوم ' . $startDate->format('Y-m-d');
+                $periodType = 'today';
             }
 
-            $sessions = $sessionsQuery->get();
+            $search = trim((string)$request->input('search', ''));
+            if ($search === 'undefined' || $search === 'null') {
+                $search = '';
+            }
 
-            foreach ($sessions as $session) {
-                $devName = $session->device?->device_name ?? 'جهاز ألعاب';
-                $devNameAr = $session->device?->device_name_ar ?? $devName;
-                $custName = $session->customer_name ?: 'عميل';
-                $durationStr = $session->is_open_ended ? 'جلسة مفتوحة' : (($session->duration_minutes ?: 0) . ' دقيقة');
-                if ($session->duration_minutes >= 60) {
-                    $hrs = floor($session->duration_minutes / 60);
-                    $remM = $session->duration_minutes % 60;
-                    $durationStr = $hrs . ' ساعة' . ($remM > 0 ? (' و ' . $remM . ' دقيقة') : '');
-                }
+            $typeFilter = $request->input('type');
+            if (!$typeFilter || in_array($typeFilter, ['undefined', 'null', 'all'])) {
+                $typeFilter = 'all';
+            }
 
-                $beverageItems = [];
-                if ($session->orders) {
-                    foreach ($session->orders as $ord) {
-                        if ($ord->items) {
-                            foreach ($ord->items as $it) {
-                                $beverageItems[] = $it->quantity . 'x ' . ($it->product?->name_ar ?? $it->product?->name ?? 'صنف');
+            $paymentFilter = $request->input('payment_method');
+            if (!$paymentFilter || in_array($paymentFilter, ['undefined', 'null', 'all'])) {
+                $paymentFilter = 'all';
+            }
+
+            // Window covering both local and UTC boundaries (±4 hours)
+            $queryStartDate = $startDate->copy()->subHours(4);
+            $queryEndDate = $endDate->copy()->addHours(4);
+
+            $paymentLabels = [
+                'cash' => 'نقدي (الدرج)',
+                'visa' => 'فيزا / بطاقة بنكية',
+                'wallet' => 'محفظة إلكترونية',
+                'instapay' => 'إنستا باي',
+                'installment' => 'تقسيط',
+                'credit' => 'آجل',
+                'other' => 'أخرى',
+            ];
+
+            $transactions = collect();
+
+            // 1. Gaming Sessions
+            if (in_array($typeFilter, ['all', 'gaming', 'cash'])) {
+                try {
+                    $sessionsQuery = DeviceSession::with(['device', 'staff', 'orders.items.product'])
+                        ->whereBetween('created_at', [$queryStartDate, $queryEndDate])
+                        ->where('status', '!=', 'cancelled');
+
+                    if ($paymentFilter !== 'all') {
+                        $sessionsQuery->where('payment_method', $paymentFilter);
+                    }
+
+                    $sessions = $sessionsQuery->get();
+
+                    foreach ($sessions as $session) {
+                        $devName = $session->device?->device_name ?? 'جهاز ألعاب';
+                        $devNameAr = $session->device?->device_name_ar ?? $devName;
+                        $custName = $session->customer_name ?: 'عميل';
+                        $durationStr = $session->is_open_ended ? 'جلسة مفتوحة' : (($session->duration_minutes ?: 0) . ' دقيقة');
+                        if ($session->duration_minutes >= 60) {
+                            $hrs = floor($session->duration_minutes / 60);
+                            $remM = $session->duration_minutes % 60;
+                            $durationStr = $hrs . ' ساعة' . ($remM > 0 ? (' و ' . $remM . ' دقيقة') : '');
+                        }
+
+                        $beverageItems = [];
+                        if ($session->orders) {
+                            foreach ($session->orders as $ord) {
+                                if ($ord->items) {
+                                    foreach ($ord->items as $it) {
+                                        $beverageItems[] = $it->quantity . 'x ' . ($it->product?->name_ar ?? $it->product?->name ?? 'صنف');
+                                    }
+                                }
                             }
                         }
+                        $beverageSummary = count($beverageItems) > 0 ? implode(', ', $beverageItems) : '';
+
+                        $cost = (float)$session->session_cost;
+                        $bevCost = (float)$session->beverage_cost;
+                        $discount = (float)$session->discount;
+                        $total = (float)$session->total_amount;
+                        $isPaid = $session->payment_status === 'paid' || ($session->status === 'ended' && $session->payment_method !== 'credit');
+                        $isCash = ($session->payment_method ?? 'cash') === 'cash' && $isPaid;
+
+                        $detailParts = ["مدة: " . $durationStr, "لعب: " . number_format($cost, 2) . " ج"];
+                        if ($bevCost > 0) $detailParts[] = "مشاريب: " . number_format($bevCost, 2) . " ج" . ($beverageSummary ? " (" . $beverageSummary . ")" : "");
+                        if ($discount > 0) $detailParts[] = "خصم: " . number_format($discount, 2) . " ج";
+
+                        $sessionCreatedAt = $session->created_at ? Carbon::parse($session->created_at) : ($session->start_time ? Carbon::parse($session->start_time) : Carbon::now());
+
+                        $transactions->push([
+                            'id' => 'session-' . $session->id,
+                            'raw_date' => $sessionCreatedAt->toISOString(),
+                            'date' => $sessionCreatedAt->format('Y-m-d'),
+                            'time' => $sessionCreatedAt->format('h:i A'),
+                            'date_time' => $sessionCreatedAt->format('Y-m-d h:i A'),
+                            'type' => 'gaming',
+                            'type_label' => 'جلسة ألعاب',
+                            'title' => $devNameAr . ' • ' . $custName,
+                            'customer_name' => $custName,
+                            'customer_phone' => $session->customer_phone,
+                            'device_name' => $devNameAr,
+                            'device_or_table' => $devNameAr,
+                            'duration' => $durationStr,
+                            'duration_minutes' => $session->duration_minutes,
+                            'details' => implode(' • ', $detailParts),
+                            'items_summary' => $beverageSummary,
+                            'payment_method' => $session->payment_method ?? 'cash',
+                            'payment_method_label' => $paymentLabels[$session->payment_method ?? 'cash'] ?? 'أخرى',
+                            'payment_status' => $session->payment_status,
+                            'is_cash' => $isCash,
+                            'total_amount' => $total,
+                            'amount_in' => $isPaid ? $total : 0.0,
+                            'amount_out' => 0.0,
+                            'net_amount' => $isPaid ? $total : 0.0,
+                            'staff_name' => $session->staff?->name ?? 'كاشير الصالة',
+                            'receipt_id' => 'SESSION-' . $session->id,
+                        ]);
                     }
+                } catch (\Throwable $e) {
+                    \Log::warning('Error loading gaming sessions in statement: ' . $e->getMessage());
                 }
-                $beverageSummary = count($beverageItems) > 0 ? implode(', ', $beverageItems) : '';
-
-                $cost = (float)$session->session_cost;
-                $bevCost = (float)$session->beverage_cost;
-                $discount = (float)$session->discount;
-                $total = (float)$session->total_amount;
-                $isPaid = $session->payment_status === 'paid' || ($session->status === 'ended' && $session->payment_method !== 'credit');
-                $isCash = ($session->payment_method ?? 'cash') === 'cash' && $isPaid;
-
-                $detailParts = ["مدة: " . $durationStr, "لعب: " . number_format($cost, 2) . " ج"];
-                if ($bevCost > 0) $detailParts[] = "مشاريب: " . number_format($bevCost, 2) . " ج" . ($beverageSummary ? " (" . $beverageSummary . ")" : "");
-                if ($discount > 0) $detailParts[] = "خصم: " . number_format($discount, 2) . " ج";
-
-                $transactions->push([
-                    'id' => 'session-' . $session->id,
-                    'raw_date' => $session->created_at->toISOString(),
-                    'date' => $session->created_at->format('Y-m-d'),
-                    'time' => $session->created_at->format('h:i A'),
-                    'date_time' => $session->created_at->format('Y-m-d h:i A'),
-                    'type' => 'gaming',
-                    'type_label' => 'جلسة ألعاب',
-                    'title' => $devNameAr . ' • ' . $custName,
-                    'customer_name' => $custName,
-                    'customer_phone' => $session->customer_phone,
-                    'device_name' => $devNameAr,
-                    'device_or_table' => $devNameAr,
-                    'duration' => $durationStr,
-                    'duration_minutes' => $session->duration_minutes,
-                    'details' => implode(' • ', $detailParts),
-                    'items_summary' => $beverageSummary,
-                    'payment_method' => $session->payment_method ?? 'cash',
-                    'payment_method_label' => $paymentLabels[$session->payment_method ?? 'cash'] ?? 'أخرى',
-                    'payment_status' => $session->payment_status,
-                    'is_cash' => $isCash,
-                    'amount_in' => $isPaid ? $total : 0.0,
-                    'amount_out' => 0.0,
-                    'net_amount' => $isPaid ? $total : 0.0,
-                    'staff_name' => $session->staff?->name ?? 'كاشير الصالة',
-                    'receipt_id' => 'SESSION-' . $session->id,
-                ]);
-            }
-        }
-
-        // 2. Standalone Cafe Orders (not tied to device session)
-        if (in_array($typeFilter, ['all', 'cafe', 'cash'])) {
-            $ordersQuery = Order::with(['items.product', 'table', 'customer', 'staff'])
-                ->whereNull('device_session_id')
-                ->whereBetween('created_at', [$queryStartDate, $queryEndDate])
-                ->where('status', '!=', 'cancelled');
-
-            if ($paymentFilter !== 'all') {
-                $ordersQuery->where('payment_method', $paymentFilter);
             }
 
-            $orders = $ordersQuery->get();
+            // 2. Standalone Cafe Orders (not tied to device session)
+            if (in_array($typeFilter, ['all', 'cafe', 'cash'])) {
+                try {
+                    $ordersQuery = Order::with(['items.product', 'table', 'customer', 'staff'])
+                        ->whereNull('device_session_id')
+                        ->whereBetween('created_at', [$queryStartDate, $queryEndDate])
+                        ->where('status', '!=', 'cancelled');
 
-            foreach ($orders as $ord) {
-                $itemsText = [];
-                if ($ord->items) {
-                    foreach ($ord->items as $it) {
-                        $itemsText[] = $it->quantity . 'x ' . ($it->product?->name_ar ?? $it->product?->name ?? 'صنف');
+                    if ($paymentFilter !== 'all') {
+                        $ordersQuery->where('payment_method', $paymentFilter);
                     }
+
+                    $orders = $ordersQuery->get();
+
+                    foreach ($orders as $ord) {
+                        $itemsText = [];
+                        if ($ord->items) {
+                            foreach ($ord->items as $it) {
+                                $itemsText[] = $it->quantity . 'x ' . ($it->product?->name_ar ?? $it->product?->name ?? 'صنف');
+                            }
+                        }
+                        $itemsSummary = implode(', ', $itemsText);
+
+                        $tableName = $ord->table ? ('طاولة ' . $ord->table->table_number) : 'تيك أواي / كافيه';
+                        $custName = $ord->customer?->name ?? ($ord->customer_name ?: 'عميل');
+                        $total = (float)$ord->total_amount;
+                        $isPaid = $ord->payment_status === 'paid' || ($ord->status === 'completed' && $ord->payment_method !== 'credit');
+                        $isCash = ($ord->payment_method ?? 'cash') === 'cash' && $isPaid;
+
+                        $ordCreatedAt = $ord->created_at ? Carbon::parse($ord->created_at) : Carbon::now();
+
+                        $transactions->push([
+                            'id' => 'order-' . $ord->id,
+                            'raw_date' => $ordCreatedAt->toISOString(),
+                            'date' => $ordCreatedAt->format('Y-m-d'),
+                            'time' => $ordCreatedAt->format('h:i A'),
+                            'date_time' => $ordCreatedAt->format('Y-m-d h:i A'),
+                            'type' => 'cafe',
+                            'type_label' => 'مبيعات كافيه',
+                            'title' => 'طلب #' . $ord->order_number . ' • ' . $tableName,
+                            'customer_name' => $custName,
+                            'customer_phone' => $ord->customer?->phone,
+                            'device_name' => null,
+                            'device_or_table' => $tableName,
+                            'duration' => null,
+                            'duration_minutes' => null,
+                            'details' => $itemsSummary ?: 'مشروبات / طلب كافيه',
+                            'items_summary' => $itemsSummary,
+                            'payment_method' => $ord->payment_method ?? 'cash',
+                            'payment_method_label' => $paymentLabels[$ord->payment_method ?? 'cash'] ?? 'أخرى',
+                            'payment_status' => $ord->payment_status,
+                            'is_cash' => $isCash,
+                            'total_amount' => $total,
+                            'amount_in' => $isPaid ? $total : 0.0,
+                            'amount_out' => 0.0,
+                            'net_amount' => $isPaid ? $total : 0.0,
+                            'staff_name' => $ord->staff?->name ?? 'كاشير الكافيه',
+                            'receipt_id' => $ord->order_number,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    \Log::warning('Error loading orders in statement: ' . $e->getMessage());
                 }
-                $itemsSummary = implode(', ', $itemsText);
-
-                $tableName = $ord->table ? ('طاولة ' . $ord->table->table_number) : 'تيك أواي / كافيه';
-                $custName = $ord->customer?->name ?? ($ord->customer_name ?: 'عميل');
-                $total = (float)$ord->total_amount;
-                $isPaid = $ord->payment_status === 'paid' || ($ord->status === 'completed' && $ord->payment_method !== 'credit');
-                $isCash = ($ord->payment_method ?? 'cash') === 'cash' && $isPaid;
-
-                $transactions->push([
-                    'id' => 'order-' . $ord->id,
-                    'raw_date' => $ord->created_at->toISOString(),
-                    'date' => $ord->created_at->format('Y-m-d'),
-                    'time' => $ord->created_at->format('h:i A'),
-                    'date_time' => $ord->created_at->format('Y-m-d h:i A'),
-                    'type' => 'cafe',
-                    'type_label' => 'مبيعات كافيه',
-                    'title' => 'طلب #' . $ord->order_number . ' • ' . $tableName,
-                    'customer_name' => $custName,
-                    'customer_phone' => $ord->customer?->phone,
-                    'device_name' => null,
-                    'device_or_table' => $tableName,
-                    'duration' => null,
-                    'duration_minutes' => null,
-                    'details' => $itemsSummary ?: 'مشروبات / طلب كافيه',
-                    'items_summary' => $itemsSummary,
-                    'payment_method' => $ord->payment_method ?? 'cash',
-                    'payment_method_label' => $paymentLabels[$ord->payment_method ?? 'cash'] ?? 'أخرى',
-                    'payment_status' => $ord->payment_status,
-                    'is_cash' => $isCash,
-                    'amount_in' => $isPaid ? $total : 0.0,
-                    'amount_out' => 0.0,
-                    'net_amount' => $isPaid ? $total : 0.0,
-                    'staff_name' => $ord->staff?->name ?? 'كاشير الكافيه',
-                    'receipt_id' => $ord->order_number,
-                ]);
             }
-        }
 
-        // 3. Expenses (مسحوبات ومصروفات الخزنة والدرج)
-        if (in_array($typeFilter, ['all', 'expense', 'cash'])) {
-                $expensesQuery = Expense::with('staff')
-                ->where(function ($q) use ($startDate, $endDate, $queryStartDate, $queryEndDate) {
-                    $q->whereBetween('created_at', [$queryStartDate, $queryEndDate])
-                      ->orWhereBetween('expense_date', [$startDate->toDateString(), $endDate->toDateString()]);
+            // 3. Expenses (مسحوبات ومصروفات الخزنة والدرج)
+            if (in_array($typeFilter, ['all', 'expense', 'cash'])) {
+                try {
+                    if (Schema::hasTable('expenses')) {
+                        $expensesQuery = Expense::with('staff')
+                            ->where(function ($q) use ($startDate, $endDate, $queryStartDate, $queryEndDate) {
+                                $q->whereBetween('created_at', [$queryStartDate, $queryEndDate])
+                                  ->orWhereBetween('expense_date', [$startDate->toDateString(), $endDate->toDateString()]);
+                            });
+
+                        if ($paymentFilter !== 'all') {
+                            $expensesQuery->where('payment_method', $paymentFilter);
+                        }
+
+                        $expenses = $expensesQuery->get();
+
+                        foreach ($expenses as $exp) {
+                            $amount = (float)$exp->amount;
+                            $isCash = ($exp->payment_method ?? 'cash') === 'cash';
+                            $expDate = $exp->created_at ? Carbon::parse($exp->created_at) : ($exp->expense_date ? Carbon::parse($exp->expense_date) : Carbon::now());
+
+                            $transactions->push([
+                                'id' => 'expense-' . $exp->id,
+                                'raw_date' => $expDate->toISOString(),
+                                'date' => $expDate->format('Y-m-d'),
+                                'time' => $expDate->format('h:i A'),
+                                'date_time' => $expDate->format('Y-m-d h:i A'),
+                                'type' => 'expense',
+                                'type_label' => 'مصروف درج',
+                                'title' => 'مصروف: ' . $exp->description,
+                                'customer_name' => null,
+                                'customer_phone' => null,
+                                'device_name' => null,
+                                'device_or_table' => null,
+                                'duration' => null,
+                                'duration_minutes' => null,
+                                'details' => 'بند: ' . $exp->category . ($exp->notes ? (' • ' . $exp->notes) : ''),
+                                'items_summary' => null,
+                                'payment_method' => $exp->payment_method ?? 'cash',
+                                'payment_method_label' => $paymentLabels[$exp->payment_method ?? 'cash'] ?? 'أخرى',
+                                'payment_status' => 'paid',
+                                'is_cash' => $isCash,
+                                'total_amount' => $amount,
+                                'amount_in' => 0.0,
+                                'amount_out' => $amount,
+                                'net_amount' => -$amount,
+                                'staff_name' => $exp->staff?->name ?? 'مسؤول الصالة',
+                                'receipt_id' => 'EXP-' . $exp->id,
+                            ]);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    \Log::warning('Error loading expenses in statement: ' . $e->getMessage());
+                }
+            }
+
+            // 4. Debt Collections (سداد حسابات الآجل)
+            if (in_array($typeFilter, ['all', 'debt_payment', 'cash'])) {
+                try {
+                    if (Schema::hasTable('customer_debt_payments')) {
+                        $debtPaymentsQuery = CustomerDebtPayment::with(['debt.customer', 'staff'])
+                            ->whereBetween('created_at', [$queryStartDate, $queryEndDate]);
+
+                        if ($paymentFilter !== 'all') {
+                            $debtPaymentsQuery->where('payment_method', $paymentFilter);
+                        }
+
+                        $debtPayments = $debtPaymentsQuery->get();
+
+                        foreach ($debtPayments as $dp) {
+                            $amount = (float)$dp->amount;
+                            $isCash = ($dp->payment_method ?? 'cash') === 'cash';
+                            $cust = $dp->debt?->customer;
+                            $dpDate = $dp->created_at ? Carbon::parse($dp->created_at) : Carbon::now();
+
+                            $transactions->push([
+                                'id' => 'debt-' . $dp->id,
+                                'raw_date' => $dpDate->toISOString(),
+                                'date' => $dpDate->format('Y-m-d'),
+                                'time' => $dpDate->format('h:i A'),
+                                'date_time' => $dpDate->format('Y-m-d h:i A'),
+                                'type' => 'debt_payment',
+                                'type_label' => 'تحصيل دين',
+                                'title' => 'تحصيل آجل • ' . ($cust?->name ?: 'عميل'),
+                                'customer_name' => $cust?->name,
+                                'customer_phone' => $cust?->phone,
+                                'device_name' => null,
+                                'device_or_table' => null,
+                                'duration' => null,
+                                'duration_minutes' => null,
+                                'details' => 'سداد جزء/كامل مديونية سابقة' . ($dp->notes ? (' • ' . $dp->notes) : ''),
+                                'items_summary' => null,
+                                'payment_method' => $dp->payment_method ?? 'cash',
+                                'payment_method_label' => $paymentLabels[$dp->payment_method ?? 'cash'] ?? 'أخرى',
+                                'payment_status' => 'paid',
+                                'is_cash' => $isCash,
+                                'total_amount' => $amount,
+                                'amount_in' => $amount,
+                                'amount_out' => 0.0,
+                                'net_amount' => $amount,
+                                'staff_name' => $dp->staff?->name ?? 'كاشير الصالة',
+                                'receipt_id' => 'DEBT-' . $dp->id,
+                            ]);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    \Log::warning('Error loading debt collections in statement: ' . $e->getMessage());
+                }
+            }
+
+            // Filter by cash only if requested
+            if ($typeFilter === 'cash') {
+                $transactions = $transactions->filter(fn($t) => $t['is_cash']);
+            }
+
+            // Filter by search query if provided
+            if ($search !== '') {
+                $sLower = mb_strtolower($search);
+                $transactions = $transactions->filter(function ($t) use ($sLower) {
+                    return str_contains(mb_strtolower($t['title'] ?? ''), $sLower) ||
+                           str_contains(mb_strtolower($t['customer_name'] ?? ''), $sLower) ||
+                           str_contains(mb_strtolower($t['device_name'] ?? ''), $sLower) ||
+                           str_contains(mb_strtolower($t['details'] ?? ''), $sLower) ||
+                           str_contains(mb_strtolower($t['receipt_id'] ?? ''), $sLower);
                 });
-
-            if ($paymentFilter !== 'all') {
-                $expensesQuery->where('payment_method', $paymentFilter);
             }
 
-            $expenses = $expensesQuery->get();
+            // Sort chronologically descending
+            $transactions = $transactions->sortByDesc('raw_date')->values();
 
-            foreach ($expenses as $exp) {
-                $amount = (float)$exp->amount;
-                $isCash = ($exp->payment_method ?? 'cash') === 'cash';
-                $expDate = $exp->created_at ?? Carbon::parse($exp->expense_date);
+            // Calculate summary
+            $totalIn = (float)$transactions->sum('amount_in');
+            $totalOut = (float)$transactions->sum('amount_out');
+            $cashIn = (float)$transactions->where('is_cash', true)->sum('amount_in');
+            $cashOut = (float)$transactions->where('is_cash', true)->sum('amount_out');
+            $cashDrawerNet = max(0, $cashIn - $cashOut);
 
-                $transactions->push([
-                    'id' => 'expense-' . $exp->id,
-                    'raw_date' => $expDate->toISOString(),
-                    'date' => $expDate->format('Y-m-d'),
-                    'time' => $expDate->format('h:i A'),
-                    'date_time' => $expDate->format('Y-m-d h:i A'),
-                    'type' => 'expense',
-                    'type_label' => 'مصروف درج',
-                    'title' => 'مصروف: ' . $exp->description,
-                    'customer_name' => null,
-                    'customer_phone' => null,
-                    'device_name' => null,
-                    'device_or_table' => null,
-                    'duration' => null,
-                    'duration_minutes' => null,
-                    'details' => 'بند: ' . $exp->category . ($exp->notes ? (' • ' . $exp->notes) : ''),
-                    'items_summary' => null,
-                    'payment_method' => $exp->payment_method ?? 'cash',
-                    'payment_method_label' => $paymentLabels[$exp->payment_method ?? 'cash'] ?? 'أخرى',
-                    'payment_status' => 'paid',
-                    'is_cash' => $isCash,
-                    'amount_in' => 0.0,
-                    'amount_out' => $amount,
-                    'net_amount' => -$amount,
-                    'staff_name' => $exp->staff?->name ?? 'مسؤول الصالة',
-                    'receipt_id' => 'EXP-' . $exp->id,
-                ]);
-            }
+            $gamingRevenue = (float)$transactions->where('type', 'gaming')->sum('amount_in');
+            $cafeRevenue = (float)$transactions->where('type', 'cafe')->sum('amount_in');
+            $debtCollected = (float)$transactions->where('type', 'debt_payment')->sum('amount_in');
+
+            return response()->json([
+                'period' => [
+                    'type' => $periodType,
+                    'label' => $periodLabel,
+                    'start_date' => $startDate->toDateString(),
+                    'end_date' => $endDate->toDateString(),
+                ],
+                'summary' => [
+                    'total_income' => round($totalIn, 2),
+                    'total_expenses' => round($totalOut, 2),
+                    'net_income' => round($totalIn - $totalOut, 2),
+                    'net_flow' => round($totalIn - $totalOut, 2),
+                    'net_cash' => round($cashIn - $cashOut, 2),
+                    'cash_drawer_net' => round($cashIn - $cashOut, 2),
+                    'cash_in' => round($cashIn, 2),
+                    'cash_out' => round($cashOut, 2),
+                    'gaming_income' => round($gamingRevenue, 2),
+                    'gaming_revenue' => round($gamingRevenue, 2),
+                    'cafe_income' => round($cafeRevenue, 2),
+                    'cafe_revenue' => round($cafeRevenue, 2),
+                    'debt_collected' => round($debtCollected, 2),
+                    'transactions_count' => $transactions->count(),
+                ],
+                'transactions' => $transactions,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('ReportController statement fatal error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'period' => [
+                    'type' => 'day',
+                    'label' => 'اليوم ' . date('Y-m-d'),
+                    'start_date' => date('Y-m-d'),
+                    'end_date' => date('Y-m-d'),
+                ],
+                'summary' => [
+                    'total_income' => 0,
+                    'total_expenses' => 0,
+                    'net_income' => 0,
+                    'net_flow' => 0,
+                    'net_cash' => 0,
+                    'cash_drawer_net' => 0,
+                    'cash_in' => 0,
+                    'cash_out' => 0,
+                    'gaming_income' => 0,
+                    'gaming_revenue' => 0,
+                    'cafe_income' => 0,
+                    'cafe_revenue' => 0,
+                    'debt_collected' => 0,
+                    'transactions_count' => 0,
+                ],
+                'transactions' => [],
+            ], 200);
         }
-
-        // 4. Debt Collections (سداد حسابات الآجل)
-        if (in_array($typeFilter, ['all', 'debt_payment', 'cash'])) {
-            if (Schema::hasTable('customer_debt_payments')) {
-                $debtPaymentsQuery = CustomerDebtPayment::with(['debt.customer', 'staff'])
-                    ->whereBetween('created_at', [$queryStartDate, $queryEndDate]);
-
-                if ($paymentFilter !== 'all') {
-                    $debtPaymentsQuery->where('payment_method', $paymentFilter);
-                }
-
-                $debtPayments = $debtPaymentsQuery->get();
-
-                foreach ($debtPayments as $dp) {
-                    $amount = (float)$dp->amount;
-                    $isCash = ($dp->payment_method ?? 'cash') === 'cash';
-                    $cust = $dp->debt?->customer;
-
-                    $transactions->push([
-                        'id' => 'debt-' . $dp->id,
-                        'raw_date' => $dp->created_at->toISOString(),
-                        'date' => $dp->created_at->format('Y-m-d'),
-                        'time' => $dp->created_at->format('h:i A'),
-                        'date_time' => $dp->created_at->format('Y-m-d h:i A'),
-                        'type' => 'debt_payment',
-                        'type_label' => 'تحصيل دين',
-                        'title' => 'تحصيل آجل • ' . ($cust?->name ?: 'عميل'),
-                        'customer_name' => $cust?->name,
-                        'customer_phone' => $cust?->phone,
-                        'device_name' => null,
-                        'device_or_table' => null,
-                        'duration' => null,
-                        'duration_minutes' => null,
-                        'details' => 'سداد جزء/كامل مديونية سابقة' . ($dp->notes ? (' • ' . $dp->notes) : ''),
-                        'items_summary' => null,
-                        'payment_method' => $dp->payment_method ?? 'cash',
-                        'payment_method_label' => $paymentLabels[$dp->payment_method ?? 'cash'] ?? 'أخرى',
-                        'payment_status' => 'paid',
-                        'is_cash' => $isCash,
-                        'amount_in' => $amount,
-                        'amount_out' => 0.0,
-                        'net_amount' => $amount,
-                        'staff_name' => $dp->staff?->name ?? 'كاشير الصالة',
-                        'receipt_id' => 'DEBT-' . $dp->id,
-                    ]);
-                }
-            }
-        }
-
-        // Filter by cash only if requested
-        if ($typeFilter === 'cash') {
-            $transactions = $transactions->filter(fn($t) => $t['is_cash']);
-        }
-
-        // Filter by search query if provided
-        if ($search !== '') {
-            $sLower = mb_strtolower($search);
-            $transactions = $transactions->filter(function ($t) use ($sLower) {
-                return str_contains(mb_strtolower($t['title'] ?? ''), $sLower) ||
-                       str_contains(mb_strtolower($t['customer_name'] ?? ''), $sLower) ||
-                       str_contains(mb_strtolower($t['device_name'] ?? ''), $sLower) ||
-                       str_contains(mb_strtolower($t['details'] ?? ''), $sLower) ||
-                       str_contains(mb_strtolower($t['receipt_id'] ?? ''), $sLower);
-            });
-        }
-
-        // Sort chronologically descending
-        $transactions = $transactions->sortByDesc('raw_date')->values();
-
-        // Calculate summary
-        $totalIn = (float)$transactions->sum('amount_in');
-        $totalOut = (float)$transactions->sum('amount_out');
-        $cashIn = (float)$transactions->where('is_cash', true)->sum('amount_in');
-        $cashOut = (float)$transactions->where('is_cash', true)->sum('amount_out');
-        $cashDrawerNet = max(0, $cashIn - $cashOut);
-
-        $gamingRevenue = (float)$transactions->where('type', 'gaming')->sum('amount_in');
-        $cafeRevenue = (float)$transactions->where('type', 'cafe')->sum('amount_in');
-        $debtCollected = (float)$transactions->where('type', 'debt_payment')->sum('amount_in');
-
-        return response()->json([
-            'period' => [
-                'type' => $periodType,
-                'label' => $periodLabel,
-                'start_date' => $startDate->toDateString(),
-                'end_date' => $endDate->toDateString(),
-            ],
-            'summary' => [
-                'total_income' => round($totalIn, 2),
-                'total_expenses' => round($totalOut, 2),
-                'net_income' => round($totalIn - $totalOut, 2),
-                'net_flow' => round($totalIn - $totalOut, 2),
-                'net_cash' => round($cashIn - $cashOut, 2),
-                'cash_drawer_net' => round($cashIn - $cashOut, 2),
-                'cash_in' => round($cashIn, 2),
-                'cash_out' => round($cashOut, 2),
-                'gaming_income' => round($gamingRevenue, 2),
-                'gaming_revenue' => round($gamingRevenue, 2),
-                'cafe_income' => round($cafeRevenue, 2),
-                'cafe_revenue' => round($cafeRevenue, 2),
-                'debt_collected' => round($debtCollected, 2),
-                'transactions_count' => $transactions->count(),
-            ],
-            'transactions' => $transactions,
-        ]);
     }
 }

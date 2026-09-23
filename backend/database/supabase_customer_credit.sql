@@ -91,6 +91,11 @@ DROP TRIGGER IF EXISTS customer_debt_payments_set_updated_at ON public.customer_
 CREATE TRIGGER customer_debt_payments_set_updated_at BEFORE UPDATE ON public.customer_debt_payments
 FOR EACH ROW EXECUTE FUNCTION public.set_customer_credit_updated_at();
 
+-- توسيع صلاحيات المستخدمين لدعم "سوبر مدير" (super_admin)
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE public.users ALTER COLUMN role TYPE varchar(50);
+ALTER TABLE public.users ALTER COLUMN role SET DEFAULT 'staff';
+
 -- Verify after running:
 -- SELECT table_name FROM information_schema.tables
 -- WHERE table_schema = 'public'

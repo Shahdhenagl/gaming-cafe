@@ -157,7 +157,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <p className="text-[11px] text-slate-400 text-center">
               Quick demo PINs: <strong className="text-purple-300">0000</strong> (Staff),{' '}
               <strong className="text-amber-300">5678</strong> (Manager),{' '}
-              <strong className="text-emerald-300">1234</strong> (Admin)
+              <strong className="text-emerald-300">1234</strong> (Super Admin)
             </p>
 
             {/* Keypad Grid */}

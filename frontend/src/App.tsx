@@ -297,14 +297,23 @@ export function App() {
     setUnreadCount(0);
   };
 
+  const isSuperAdminOrAdmin = user?.role === 'super_admin' || user?.role === 'admin';
+  const isManagerOrAbove = isSuperAdminOrAdmin || user?.role === 'manager';
+
+  useEffect(() => {
+    if (!isSuperAdminOrAdmin && activeTab === 'analytics') {
+      setActiveTab('gaming');
+    }
+  }, [user?.role, activeTab, isSuperAdminOrAdmin]);
+
   const navItems = [
     { id: 'gaming', label: t.navGaming, icon: Gamepad2 },
     { id: 'pos', label: t.navPos, icon: Coffee },
     { id: 'tables', label: t.navTables, icon: Users },
     { id: 'shift', label: t.navShift, icon: Clock },
     { id: 'inventory', label: t.navInventory, icon: Package },
-    { id: 'analytics', label: t.navAnalytics, icon: BarChart3 },
-    { id: 'management', label: lang === 'ar' ? 'لوحة التحكم' : 'Management', icon: Users },
+    ...(isSuperAdminOrAdmin ? [{ id: 'analytics', label: t.navAnalytics, icon: BarChart3 }] : []),
+    ...(isManagerOrAbove ? [{ id: 'management', label: lang === 'ar' ? 'لوحة التحكم' : 'Management', icon: Users }] : []),
     { id: 'debts', label: lang === 'ar' ? 'آجل العملاء' : 'Customer Debts', icon: CreditCard },
   ];
 

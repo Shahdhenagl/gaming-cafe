@@ -683,12 +683,21 @@ class ApiService {
     payment_method?: string;
     search?: string;
   }): Promise<StatementResponse> {
-    if (isStandalone) return mockStore.getStatement(params);
+    const cleanParams: Record<string, string> = {};
+    if (params) {
+      Object.entries(params).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '' && val !== 'undefined') {
+          cleanParams[key] = String(val);
+        }
+      });
+    }
+
+    if (isStandalone) return mockStore.getStatement(cleanParams);
     try {
-      const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
+      const query = Object.keys(cleanParams).length > 0 ? `?${new URLSearchParams(cleanParams).toString()}` : '';
       return await this.request<StatementResponse>(`/reports/statement${query}`);
     } catch (error) {
-      if (this.canUseMockFallback(error)) return mockStore.getStatement(params);
+      if (this.canUseMockFallback(error)) return mockStore.getStatement(cleanParams);
       throw error;
     }
   }

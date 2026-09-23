@@ -372,126 +372,166 @@ class SessionController extends Controller
             'items.*.notes' => 'nullable|string',
         ]);
 
-        $device = Device::findOrFail($request->device_id);
-        $shift = Shift::where('status', 'active')->latest()->first();
+        try {
+            $device = Device::findOrFail($request->device_id);
+            $shift = Shift::where('status', 'active')->latest()->first();
 
-        $startTime = $request->filled('start_time') ? Carbon::parse($request->start_time) : Carbon::now()->subMinutes($request->duration_minutes ?? 60);
-        $endTime = $request->filled('end_time') ? Carbon::parse($request->end_time) : (clone $startTime)->addMinutes($request->duration_minutes ?? 60);
-        $durationMinutes = $request->filled('duration_minutes') ? (int)$request->duration_minutes : max(1, (int)ceil($startTime->diffInSeconds($endTime) / 60));
+            $startTime = $request->filled('start_time') ? Carbon::parse($request->start_time) : Carbon::now()->subMinutes($request->duration_minutes ?? 60);
+            $endTime = $request->filled('end_time') ? Carbon::parse($request->end_time) : (clone $startTime)->addMinutes($request->duration_minutes ?? 60);
+            $durationMinutes = $request->filled('duration_minutes') ? (int)$request->duration_minutes : max(1, (int)ceil($startTime->diffInSeconds($endTime) / 60));
 
-        $hourlyRate = $request->filled('hourly_rate') ? (float)$request->hourly_rate : (float)$device->hourly_rate;
-        $sessionCost = $request->filled('session_cost') ? (float)$request->session_cost : round(($durationMinutes / 60) * $hourlyRate, 2);
-        $discount = (float)($request->discount ?? 0.00);
-        $paymentMethod = $request->payment_method;
+            $hourlyRate = $request->filled('hourly_rate') ? (float)$request->hourly_rate : (float)$device->hourly_rate;
+            $sessionCost = $request->filled('session_cost') ? (float)$request->session_cost : round(($durationMinutes / 60) * $hourlyRate, 2);
+            $discount = (float)($request->discount ?? 0.00);
+            $paymentMethod = $request->payment_method;
 
-        $result = DB::transaction(function () use ($device, $shift, $startTime, $endTime, $durationMinutes, $hourlyRate, $sessionCost, $discount, $paymentMethod, $request) {
-            $totalBeveragePrice = 0.0;
-            $itemsData = [];
-
-            if ($request->filled('items') && is_array($request->items)) {
-                foreach ($request->items as $it) {
-                    $prod = Product::findOrFail($it['product_id']);
-                    $qty = (int)$it['quantity'];
-                    $subtotal = round($prod->price * $qty, 2);
-                    $totalBeveragePrice += $subtotal;
-                    $itemsData[] = [
-                        'product' => $prod,
-                        'quantity' => $qty,
-                        'unit_price' => $prod->price,
-                        'cost_price' => $prod->cost_price ?? 0,
-                        'subtotal' => $subtotal,
-                        'notes' => $it['notes'] ?? null,
-                    ];
-                    // Decrement stock & log
-                    $prod->decrement('stock_quantity', $qty);
-                    InventoryLog::create([
-                        'product_id' => $prod->id,
-                        'quantity_change' => -$qty,
-                        'reason' => 'sale',
-                        'staff_id' => $request->user()?->id,
-                    ]);
-                }
+            $staffId = $request->user()?->id ?? $shift?->staff_id;
+            if (!$staffId) {
+                $staffId = \App\Models\User::query()->value('id');
             }
 
-            $finalTotal = max(0, $sessionCost + $totalBeveragePrice - $discount);
-            $amountPaid = $request->filled('amount_paid') ? (float)$request->amount_paid : $finalTotal;
+            $result = DB::transaction(function () use ($device, $shift, $startTime, $endTime, $durationMinutes, $hourlyRate, $sessionCost, $discount, $paymentMethod, $staffId, $request) {
+                $totalBeveragePrice = 0.0;
+                $itemsData = [];
 
-            $customer = $paymentMethod === 'credit'
-                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name])
-                : null;
+                if ($request->filled('items') && is_array($request->items)) {
+                    foreach ($request->items as $it) {
+                        $prod = Product::findOrFail($it['product_id']);
+                        $qty = (int)$it['quantity'];
+                        $subtotal = round($prod->price * $qty, 2);
+                        $totalBeveragePrice += $subtotal;
+                        $itemsData[] = [
+                            'product' => $prod,
+                            'quantity' => $qty,
+                            'unit_price' => $prod->price,
+                            'cost_price' => $prod->cost_price ?? 0,
+                            'subtotal' => $subtotal,
+                            'notes' => $it['notes'] ?? null,
+                        ];
+                        // Decrement stock & log
+                        $prod->decrement('stock_quantity', $qty);
+                        InventoryLog::create([
+                            'product_id' => $prod->id,
+                            'quantity_change' => -$qty,
+                            'reason' => 'sale',
+                            'staff_id' => $staffId,
+                        ]);
+                    }
+                }
 
-            $session = DeviceSession::create([
-                'device_id' => $device->id,
-                'shift_id' => $shift?->id,
-                'staff_id' => $request->user()?->id ?? ($shift?->staff_id ?? 1),
-                'customer_name' => $request->customer_name ?: 'عميل يدوي / أوفلاين',
-                'customer_phone' => $request->customer_phone,
-                'start_time' => $startTime,
-                'end_time' => $endTime,
-                'duration_minutes' => $durationMinutes,
-                'is_open_ended' => false,
-                'status' => 'ended', // Ended immediately! Device stays available!
-                'hourly_rate' => $hourlyRate,
-                'session_cost' => $sessionCost,
-                'beverage_cost' => $totalBeveragePrice,
-                'discount' => $discount,
-                'total_amount' => $finalTotal,
-                'paid_amount' => $paymentMethod === 'credit' ? 0 : $amountPaid,
-                'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
-                'payment_method' => $paymentMethod,
-            ]);
+                $finalTotal = max(0, $sessionCost + $totalBeveragePrice - $discount);
+                $amountPaid = $request->filled('amount_paid') ? (float)$request->amount_paid : $finalTotal;
 
-            $order = null;
-            if (count($itemsData) > 0) {
-                $order = Order::create([
-                    'order_number' => 'ORD-M' . strtoupper(bin2hex(random_bytes(2))),
+                $customer = null;
+                $custName = trim((string)($request->customer_name ?: 'عميل يدوي / أوفلاين'));
+                $custPhone = trim((string)($request->customer_phone ?: ''));
+
+                if ($paymentMethod === 'credit') {
+                    if ($custName === '') {
+                        $custName = 'عميل آجل';
+                    }
+                    if ($custPhone === '') {
+                        $custPhone = '01' . mt_rand(100000000, 999999999);
+                    }
+                    if (\Illuminate\Support\Facades\Schema::hasTable('customers')) {
+                        try {
+                            $customer = Customer::updateOrCreate(
+                                ['phone' => $custPhone],
+                                ['name' => $custName, 'is_archived' => false]
+                            );
+                        } catch (\Throwable $e) {
+                            \Log::warning('Could not auto-create customer for manual session credit: ' . $e->getMessage());
+                            $customer = Customer::where('phone', $custPhone)->first();
+                        }
+                    }
+                }
+
+                $session = DeviceSession::create([
+                    'device_id' => $device->id,
                     'shift_id' => $shift?->id,
-                    'staff_id' => $request->user()?->id,
-                    'customer_id' => $customer?->id,
-                    'status' => 'completed',
-                    'order_type' => 'gaming_room',
-                    'device_session_id' => $session->id,
-                    'subtotal' => $totalBeveragePrice,
-                    'discount' => 0,
-                    'tax' => 0,
-                    'total_amount' => $totalBeveragePrice,
-                    'payment_method' => $paymentMethod,
+                    'staff_id' => $staffId,
+                    'customer_name' => $custName,
+                    'customer_phone' => $custPhone ?: null,
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                    'duration_minutes' => $durationMinutes,
+                    'is_open_ended' => false,
+                    'status' => 'ended', // Ended immediately! Device stays available!
+                    'hourly_rate' => $hourlyRate,
+                    'session_cost' => $sessionCost,
+                    'beverage_cost' => $totalBeveragePrice,
+                    'discount' => $discount,
+                    'total_amount' => $finalTotal,
+                    'paid_amount' => $paymentMethod === 'credit' ? 0 : $amountPaid,
                     'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
+                    'payment_method' => $paymentMethod,
                 ]);
 
-                foreach ($itemsData as $itData) {
-                    OrderItem::create([
-                        'order_id' => $order->id,
-                        'product_id' => $itData['product']->id,
-                        'quantity' => $itData['quantity'],
-                        'unit_price' => $itData['unit_price'],
-                        'cost_price' => $itData['cost_price'],
-                        'subtotal' => $itData['subtotal'],
-                        'notes' => $itData['notes'],
+                $order = null;
+                if (count($itemsData) > 0) {
+                    $order = Order::create([
+                        'order_number' => 'ORD-M' . strtoupper(bin2hex(random_bytes(2))),
+                        'shift_id' => $shift?->id,
+                        'staff_id' => $staffId,
+                        'customer_id' => $customer?->id,
+                        'status' => 'completed',
+                        'order_type' => 'gaming_room',
+                        'device_session_id' => $session->id,
+                        'subtotal' => $totalBeveragePrice,
+                        'discount' => 0,
+                        'tax' => 0,
+                        'total_amount' => $totalBeveragePrice,
+                        'payment_method' => $paymentMethod,
+                        'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
+                    ]);
+
+                    foreach ($itemsData as $itData) {
+                        OrderItem::create([
+                            'order_id' => $order->id,
+                            'product_id' => $itData['product']->id,
+                            'quantity' => $itData['quantity'],
+                            'unit_price' => $itData['unit_price'],
+                            'cost_price' => $itData['cost_price'],
+                            'subtotal' => $itData['subtotal'],
+                            'notes' => $itData['notes'],
+                        ]);
+                    }
+                }
+
+                if ($paymentMethod === 'credit') {
+                    if ($customer && \Illuminate\Support\Facades\Schema::hasTable('customer_debts')) {
+                        try {
+                            CustomerDebt::create([
+                                'customer_id' => $customer->id,
+                                'device_session_id' => $session->id,
+                                'shift_id' => $shift?->id,
+                                'amount' => $finalTotal,
+                                'paid_amount' => 0,
+                                'description' => 'جلسة يدوية سابقة - ' . ($device->device_name_ar ?: $device->device_name),
+                                'status' => 'open',
+                            ]);
+                        } catch (\Throwable $e) {
+                            \Log::error('Could not create CustomerDebt for manual session: ' . $e->getMessage());
+                        }
+                    }
+                } else {
+                    Payment::create([
+                        'device_session_id' => $session->id,
+                        'shift_id' => $shift?->id,
+                        'amount' => $amountPaid,
+                        'payment_method' => $paymentMethod,
+                        'status' => 'confirmed',
                     ]);
                 }
-            }
 
-            if ($paymentMethod === 'credit' && $customer) {
-                CustomerDebt::create([
-                    'customer_id' => $customer->id,
-                    'device_session_id' => $session->id,
-                    'shift_id' => $shift?->id,
-                    'amount' => $finalTotal,
-                    'description' => 'جلسة يدوية سابقة - ' . $device->device_name,
-                ]);
-            } else {
-                Payment::create([
-                    'device_session_id' => $session->id,
-                    'shift_id' => $shift?->id,
-                    'amount' => $amountPaid,
-                    'payment_method' => $paymentMethod,
-                    'status' => 'confirmed',
-                ]);
-            }
-
-            return ['session' => $session->fresh(['device', 'orders.items.product']), 'order' => $order];
-        });
+                return ['session' => $session->fresh(['device', 'orders.items.product']), 'order' => $order];
+            });
+        } catch (\Throwable $e) {
+            \Log::error('addManualSession failure: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'message' => 'تعذر تسجيل الجلسة اليدوية: ' . $e->getMessage()
+            ], 422);
+        }
 
         $session = $result['session'];
         $receiptItems = $session->orders

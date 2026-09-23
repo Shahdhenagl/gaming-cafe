@@ -18,7 +18,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:255', 'email' => 'required|email|unique:users,email',
             'phone' => 'nullable|string|max:30', 'pin_code' => 'required|string|size:4|unique:users,pin_code',
-            'role' => 'required|in:admin,manager,staff', 'password' => 'nullable|string|min:4',
+            'role' => 'required|in:super_admin,admin,manager,staff', 'password' => 'nullable|string|min:4',
         ]);
         $data['password'] = $data['password'] ?? $data['pin_code'];
         return response()->json(['user' => User::create($data)], 201);
@@ -30,7 +30,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => 'sometimes|string|max:255', 'email' => 'sometimes|email|unique:users,email,' . $id,
             'phone' => 'nullable|string|max:30', 'pin_code' => 'sometimes|string|size:4|unique:users,pin_code,' . $id,
-            'role' => 'sometimes|in:admin,manager,staff', 'password' => 'nullable|string|min:4',
+            'role' => 'sometimes|in:super_admin,admin,manager,staff', 'password' => 'nullable|string|min:4',
         ]);
         if (empty($data['password'])) unset($data['password']);
         $user->update($data);

@@ -31,7 +31,7 @@ const INITIAL_USERS: User[] = [
     email: 'admin@al5al.com',
     pin_code: '1234',
     phone: '01032890430',
-    role: 'admin',
+    role: 'super_admin',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
   },
   {

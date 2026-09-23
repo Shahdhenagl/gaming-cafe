@@ -630,7 +630,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
 
                       {/* Amount In (+) */}
                       <td className="p-3 text-center whitespace-nowrap font-mono font-bold text-emerald-400" dir="ltr">
-                        {tx.amount_in > 0 ? `+${formatMoney(tx.amount_in)}` : '-'}
+                        {tx.payment_method === 'credit' ? (
+                          <span className="text-amber-400 font-bold bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/40">
+                            {formatMoney((tx as any).total_amount || tx.net_amount || 0)} (آجل)
+                          </span>
+                        ) : tx.amount_in > 0 ? (
+                          `+${formatMoney(tx.amount_in)}`
+                        ) : (
+                          '-'
+                        )}
                       </td>
 
                       {/* Amount Out (-) */}
@@ -640,9 +648,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang }) => {
 
                       {/* Net Amount */}
                       <td className="p-3 text-center whitespace-nowrap font-mono font-black" dir="ltr">
-                        <span className={tx.net_amount >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
-                          {formatMoney(tx.net_amount)} {t.currency}
-                        </span>
+                        {tx.payment_method === 'credit' ? (
+                          <span className="text-amber-300 font-semibold">
+                            {formatMoney((tx as any).total_amount || tx.net_amount || 0)} {t.currency} (آجل)
+                          </span>
+                        ) : (
+                          <span className={tx.net_amount >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
+                            {formatMoney(tx.net_amount)} {t.currency}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

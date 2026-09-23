@@ -324,8 +324,11 @@ export const Header: React.FC<HeaderProps> = ({
                 <p className="font-semibold text-white leading-tight">
                   {user ? user.name : 'Guest Cashier'}
                 </p>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider">
-                  {user ? user.role : 'Staff'}
+                <p className="text-[10px] text-slate-400 font-medium">
+                  {user?.role === 'super_admin' ? (lang === 'ar' ? 'سوبر مدير' : 'Super Admin') :
+                   user?.role === 'admin' ? (lang === 'ar' ? 'مدير عام' : 'Admin') :
+                   user?.role === 'manager' ? (lang === 'ar' ? 'مدير صالة' : 'Manager') :
+                   (lang === 'ar' ? 'كاشير' : 'Staff')}
                 </p>
               </div>
             </button>
@@ -339,8 +342,17 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="px-3 py-2 border-b border-border/60 mb-1">
                   <p className="font-semibold text-sm text-white">{user?.name || 'Staff'}</p>
                   <p className="text-xs text-slate-400">{user?.email || 'staff@gamingcafe.com'}</p>
-                  <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-primary/20 text-purple-300 border border-primary/30">
-                    {user?.role || 'staff'}
+                  <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
+                    user?.role === 'super_admin'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : user?.role === 'admin'
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                      : 'bg-primary/20 text-cyan-300 border-primary/30'
+                  }`}>
+                    {user?.role === 'super_admin' ? (lang === 'ar' ? 'سوبر مدير' : 'Super Admin') :
+                     user?.role === 'admin' ? (lang === 'ar' ? 'مدير عام' : 'Admin') :
+                     user?.role === 'manager' ? (lang === 'ar' ? 'مدير صالة' : 'Manager') :
+                     (lang === 'ar' ? 'كاشير / موظف' : 'Staff')}
                   </span>
                 </div>
 
