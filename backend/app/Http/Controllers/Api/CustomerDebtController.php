@@ -160,8 +160,8 @@ class CustomerDebtController extends Controller
                 'notes' => $validated['notes'] ?? null,
             ]);
             Payment::create([
-                'order_id' => $debt->order_id,
-                'device_session_id' => $debt->device_session_id,
+                'order_id' => null,
+                'device_session_id' => null,
                 'shift_id' => $activeShift?->id,
                 'amount' => $validated['amount'],
                 'payment_method' => $validated['payment_method'],

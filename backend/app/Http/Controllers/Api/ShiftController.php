@@ -81,20 +81,12 @@ class ShiftController extends Controller
 
         $ordersCash = (float) $orders->where('payment_method', 'cash')->where('payment_status', 'paid')->sum('total_amount');
         $sessionsCash = (float) $sessions->where('payment_method', 'cash')->where('payment_status', 'paid')->sum(fn ($session) => $this->sessionRevenue($session));
-        $debtCash = 0;
-        if (Schema::hasTable('customer_debt_payments')) {
-            $debtCash = (float) CustomerDebtPayment::whereBetween('created_at', [$shift->start_time, Carbon::now()])
-                ->where('payment_method', 'cash')
-                ->sum('amount');
-        }
-        if ($debtCash <= 0) {
-            $debtCash = (float) Payment::where('shift_id', $shift->id)
-                ->whereNull('order_id')
-                ->whereNull('device_session_id')
-                ->where('payment_method', 'cash')
-                ->where('status', 'confirmed')
-                ->sum('amount');
-        }
+        $debtCash = (float) Payment::where('shift_id', $shift->id)
+            ->whereNull('order_id')
+            ->whereNull('device_session_id')
+            ->where('payment_method', 'cash')
+            ->where('status', 'confirmed')
+            ->sum('amount');
         $cashRevenue = $ordersCash + $sessionsCash + $debtCash;
         $cashExpenses = (float) $expenses->where('payment_method', 'cash')->sum('amount');
         $cashTotal = max(0, $cashRevenue - $cashExpenses);
@@ -215,20 +207,12 @@ class ShiftController extends Controller
         $netProfit = (float) $totalRevenue - $beverageCost - (float) $expenses->sum('amount');
         $ordersCash = (float) $orders->where('payment_method', 'cash')->where('payment_status', 'paid')->sum('total_amount');
         $sessionsCash = (float) $sessions->where('payment_method', 'cash')->where('payment_status', 'paid')->sum(fn ($session) => $this->sessionRevenue($session));
-        $debtCash = 0;
-        if (Schema::hasTable('customer_debt_payments')) {
-            $debtCash = (float) CustomerDebtPayment::whereBetween('created_at', [$shift->start_time, Carbon::now()])
-                ->where('payment_method', 'cash')
-                ->sum('amount');
-        }
-        if ($debtCash <= 0) {
-            $debtCash = (float) Payment::where('shift_id', $shift->id)
-                ->whereNull('order_id')
-                ->whereNull('device_session_id')
-                ->where('payment_method', 'cash')
-                ->where('status', 'confirmed')
-                ->sum('amount');
-        }
+        $debtCash = (float) Payment::where('shift_id', $shift->id)
+            ->whereNull('order_id')
+            ->whereNull('device_session_id')
+            ->where('payment_method', 'cash')
+            ->where('status', 'confirmed')
+            ->sum('amount');
         $cashRevenue = $ordersCash + $sessionsCash + $debtCash;
         $cashExpenses = (float) $expenses->where('payment_method', 'cash')->sum('amount');
         $cashTotal = max(0, $cashRevenue - $cashExpenses);

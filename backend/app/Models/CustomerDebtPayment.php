@@ -5,4 +5,5 @@ class CustomerDebtPayment extends Model {
     protected $fillable = ['customer_debt_id','amount','payment_method','staff_id','notes'];
     protected $casts = ['amount'=>'float'];
     public function debt() { return $this->belongsTo(CustomerDebt::class, 'customer_debt_id'); }
+    public function staff() { return $this->belongsTo(User::class, 'staff_id'); }
 }
