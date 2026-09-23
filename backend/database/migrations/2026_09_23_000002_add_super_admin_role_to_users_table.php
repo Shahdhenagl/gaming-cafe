@@ -11,7 +11,7 @@ return new class extends Migration
     {
         $driver = DB::getDriverName();
         if ($driver === 'mysql') {
-            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin', 'admin', 'manager', 'staff') NOT NULL DEFAULT 'staff'");
+            DB::statement("ALTER TABLE users MODIFY COLUMN role VARCHAR(30) NOT NULL DEFAULT 'staff'");
         } elseif ($driver === 'pgsql') {
             // Drop enum check if any or convert role to varchar(50)
             try {
@@ -19,6 +19,10 @@ return new class extends Migration
             } catch (\Throwable $e) {}
             DB::statement("ALTER TABLE users ALTER COLUMN role TYPE varchar(50)");
             DB::statement("ALTER TABLE users ALTER COLUMN role SET DEFAULT 'staff'");
+        } elseif ($driver === 'sqlite') {
+            Schema::table('users', function (Blueprint $table) {
+                $table->string('role', 30)->default('staff')->change();
+            });
         }
     }
 

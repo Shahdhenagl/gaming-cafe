@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('pin_code', 10)->nullable()->index();
             $table->string('phone')->nullable();
-            $table->enum('role', ['admin', 'manager', 'staff'])->default('staff');
+            $table->string('role', 30)->default('staff');
             $table->unsignedBigInteger('shift_id')->nullable();
             $table->string('avatar')->nullable();
             $table->timestamp('email_verified_at')->nullable();
