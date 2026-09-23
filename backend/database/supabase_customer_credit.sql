@@ -6,9 +6,13 @@ CREATE TABLE IF NOT EXISTS public.customers (
   name varchar(255) NOT NULL,
   phone varchar(40) NOT NULL UNIQUE,
   notes text NULL,
+  is_archived boolean NOT NULL DEFAULT false,
   created_at timestamptz NULL DEFAULT now(),
   updated_at timestamptz NULL DEFAULT now()
 );
+
+ALTER TABLE public.customers
+  ADD COLUMN IF NOT EXISTS is_archived boolean NOT NULL DEFAULT false;
 
 ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS customer_id bigint NULL;

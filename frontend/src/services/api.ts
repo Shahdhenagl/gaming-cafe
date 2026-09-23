@@ -411,14 +411,85 @@ class ApiService {
     }
   }
 
-  async getCustomerDebts(search = '') {
-    const query = search ? `?search=${encodeURIComponent(search)}` : '';
-    return this.request<{ customers: Array<{ id: number; name: string; phone: string; total_debt: number; total_paid: number; remaining_debt: number; debts: any[] }> }>(`/customer-debts${query}`);
+  async getCustomerDebts(params: { search?: string; tab?: string; archived?: boolean; filter?: string } | string = '') {
+    if (isStandalone) return (mockStore as any).getCustomerDebts(params);
+    try {
+      let query = '';
+      if (typeof params === 'string') {
+        query = params ? `?search=${encodeURIComponent(params)}` : '';
+      } else {
+        const sp = new URLSearchParams();
+        if (params.search) sp.set('search', params.search);
+        if (params.tab) sp.set('tab', params.tab);
+        if (params.archived !== undefined) sp.set('archived', String(params.archived));
+        if (params.filter) sp.set('filter', params.filter);
+        const qStr = sp.toString();
+        if (qStr) query = `?${qStr}`;
+      }
+      return await this.request<{ 
+        customers: Array<{ 
+          id: number; 
+          name: string; 
+          phone: string; 
+          total_debt: number; 
+          total_paid: number; 
+          remaining_debt: number; 
+          is_archived?: boolean;
+          debts: any[] 
+        }>;
+        summary?: {
+          total_remaining: number;
+          active_with_debt_count: number;
+          active_zero_debt_count: number;
+          archived_count: number;
+        }
+      }>(`/customer-debts${query}`);
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return (mockStore as any).getCustomerDebts(params);
+      throw error;
+    }
   }
 
   async payCustomerDebt(debtId: number, data: { amount: number; payment_method: string; notes?: string }) {
-    return this.request(`/customer-debts/${debtId}/pay`, { method: 'POST', body: JSON.stringify(data) });
+    if (isStandalone) return (mockStore as any).payCustomerDebt(debtId, data);
+    try {
+      return await this.request(`/customer-debts/${debtId}/pay`, { method: 'POST', body: JSON.stringify(data) });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return (mockStore as any).payCustomerDebt(debtId, data);
+      throw error;
+    }
   }
+
+  async archiveCustomer(customerId: number) {
+    if (isStandalone) return (mockStore as any).archiveCustomer(customerId);
+    try {
+      return await this.request<{ message: string; customer: any }>(`/customer-debts/${customerId}/archive`, { method: 'POST' });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return (mockStore as any).archiveCustomer(customerId);
+      throw error;
+    }
+  }
+
+  async restoreCustomer(customerId: number) {
+    if (isStandalone) return (mockStore as any).restoreCustomer(customerId);
+    try {
+      return await this.request<{ message: string; customer: any }>(`/customer-debts/${customerId}/restore`, { method: 'POST' });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return (mockStore as any).restoreCustomer(customerId);
+      throw error;
+    }
+  }
+
+  async deleteCustomer(customerId: number) {
+    if (isStandalone) return (mockStore as any).deleteCustomer(customerId);
+    try {
+      return await this.request<{ message: string }>(`/customer-debts/${customerId}`, { method: 'DELETE' });
+    } catch (error) {
+      if (this.canUseMockFallback(error)) return (mockStore as any).deleteCustomer(customerId);
+      throw error;
+    }
+  }
+
 
   // --- Tables ---
   async getTables(): Promise<{ tables: Table[]; summary: { total_tables: number; occupied_tables: number; available_tables: number } }> {

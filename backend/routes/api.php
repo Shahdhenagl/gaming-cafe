@@ -95,6 +95,9 @@ $apiRoutes = function () {
         Route::get('/customer-debts', [CustomerDebtController::class, 'index']);
         Route::get('/customer-debts/{id}', [CustomerDebtController::class, 'show']);
         Route::post('/customer-debts/{debtId}/pay', [CustomerDebtController::class, 'pay']);
+        Route::post('/customer-debts/{id}/archive', [CustomerDebtController::class, 'archive']);
+        Route::post('/customer-debts/{id}/restore', [CustomerDebtController::class, 'restore']);
+        Route::delete('/customer-debts/{id}', [CustomerDebtController::class, 'destroy']);
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
         Route::patch('/users/{id}', [UserController::class, 'update']);

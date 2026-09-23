@@ -1292,6 +1292,140 @@ class MockStore {
       transactions: filtered,
     };
   }
+
+  // --- Customer Debts Mock Implementation ---
+  private mockCustomers = [
+    {
+      id: 1,
+      name: 'ابانوب',
+      phone: '01289515505',
+      total_debt: 120.0,
+      total_paid: 0.0,
+      remaining_debt: 120.0,
+      is_archived: false,
+      debts: [
+        { id: 101, description: 'فاتورة ORD-06CDD1', amount: 70.0, paid_amount: 0.0, remaining_amount: 70.0, status: 'open' },
+        { id: 102, description: 'فاتورة ORD-583424', amount: 50.0, paid_amount: 0.0, remaining_amount: 50.0, status: 'open' },
+      ],
+    },
+    {
+      id: 2,
+      name: 'الغريب',
+      phone: '01052890430',
+      total_debt: 85.0,
+      total_paid: 85.0,
+      remaining_debt: 0.0,
+      is_archived: false,
+      debts: [],
+    },
+    {
+      id: 3,
+      name: 'رامي',
+      phone: '01080644972',
+      total_debt: 45.0,
+      total_paid: 45.0,
+      remaining_debt: 0.0,
+      is_archived: false,
+      debts: [],
+    },
+    {
+      id: 4,
+      name: 'رامي',
+      phone: '01285676547',
+      total_debt: 60.0,
+      total_paid: 60.0,
+      remaining_debt: 0.0,
+      is_archived: false,
+      debts: [],
+    },
+    {
+      id: 5,
+      name: 'رامي',
+      phone: '01234673543',
+      total_debt: 35.0,
+      total_paid: 35.0,
+      remaining_debt: 0.0,
+      is_archived: false,
+      debts: [],
+    },
+  ];
+
+  getCustomerDebts(params: { search?: string; tab?: string; archived?: boolean; filter?: string } | string = '') {
+    const search = (typeof params === 'string' ? params : params?.search || '').toLowerCase().trim();
+    const tab = typeof params === 'object' ? (params.tab || (params.archived ? 'archived' : 'active')) : 'active';
+
+    let list = this.mockCustomers;
+
+    if (search) {
+      list = list.filter(c => c.name.toLowerCase().includes(search) || c.phone.includes(search));
+    }
+
+    if (tab === 'archived') {
+      list = list.filter(c => c.is_archived);
+    } else if (tab === 'active') {
+      list = list.filter(c => !c.is_archived && c.remaining_debt > 0);
+    } else if (tab === 'zero_debt') {
+      list = list.filter(c => !c.is_archived && c.remaining_debt <= 0);
+    } else if (tab === 'all') {
+      list = list.filter(c => !c.is_archived);
+    }
+
+    const activeWithDebtCount = this.mockCustomers.filter(c => !c.is_archived && c.remaining_debt > 0).length;
+    const activeZeroDebtCount = this.mockCustomers.filter(c => !c.is_archived && c.remaining_debt <= 0).length;
+    const archivedCount = this.mockCustomers.filter(c => c.is_archived).length;
+
+    return {
+      customers: list,
+      summary: {
+        total_remaining: list.reduce((acc, c) => acc + c.remaining_debt, 0),
+        active_with_debt_count: activeWithDebtCount,
+        active_zero_debt_count: activeZeroDebtCount,
+        archived_count: archivedCount,
+      },
+    };
+  }
+
+  payCustomerDebt(debtId: number, data: { amount: number; payment_method: string }) {
+    for (const cust of this.mockCustomers) {
+      const debt = cust.debts.find(d => d.id === debtId);
+      if (debt) {
+        debt.paid_amount += data.amount;
+        debt.remaining_amount = Math.max(0, debt.amount - debt.paid_amount);
+        cust.total_paid += data.amount;
+        cust.remaining_debt = Math.max(0, cust.total_debt - cust.total_paid);
+        break;
+      }
+    }
+    return { message: 'تم تسجيل سداد الدين بنجاح' };
+  }
+
+  archiveCustomer(customerId: number) {
+    const cust = this.mockCustomers.find(c => c.id === customerId);
+    if (cust) {
+      cust.is_archived = true;
+    }
+    return { message: 'تم نقل العميل إلى الأرشيف بنجاح. يمكنك استعادته في أي وقت.', customer: cust };
+  }
+
+  restoreCustomer(customerId: number) {
+    const cust = this.mockCustomers.find(c => c.id === customerId);
+    if (cust) {
+      cust.is_archived = false;
+    }
+    return { message: 'تمت استعادة العميل من الأرشيف بنجاح.', customer: cust };
+  }
+
+  deleteCustomer(customerId: number) {
+    const custIndex = this.mockCustomers.findIndex(c => c.id === customerId);
+    if (custIndex >= 0) {
+      const cust = this.mockCustomers[custIndex];
+      if (cust.remaining_debt > 0) {
+        throw new Error('لا يمكن حذف العميل لوجود مديونية متبقية');
+      }
+      this.mockCustomers.splice(custIndex, 1);
+    }
+    return { message: 'تم حذف العميل نهائياً بنجاح.' };
+  }
 }
 
 export const mockStore = new MockStore();
