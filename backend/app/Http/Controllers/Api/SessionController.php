@@ -526,55 +526,62 @@ class SessionController extends Controller
 
                 return ['session' => $session->fresh(['device', 'orders.items.product']), 'order' => $order];
             });
+
+            $session = $result['session'];
+            $receiptItems = $session->orders
+                ? $session->orders
+                    ->flatMap(fn ($order) => $order->items ?? collect())
+                    ->map(fn ($item) => [
+                        'name' => $item->product?->name ?? 'صنف',
+                        'name_ar' => $item->product?->name_ar ?? $item->product?->name ?? 'صنف',
+                        'quantity' => (int) $item->quantity,
+                        'unit_price' => (float) $item->unit_price,
+                        'subtotal' => (float) $item->subtotal,
+                    ])->values()->all()
+                : [];
+
+            $devName = $session->device?->device_name_ar ?: ($session->device?->device_name ?? 'جهاز ألعاب');
+            $roomName = $session->device?->room_name ?? 'صالة الألعاب';
+            $startTimeFormatted = $session->start_time ? Carbon::parse($session->start_time)->format('Y-m-d H:i') : Carbon::now()->format('Y-m-d H:i');
+            $endTimeFormatted = $session->end_time ? Carbon::parse($session->end_time)->format('Y-m-d H:i') : Carbon::now()->format('Y-m-d H:i');
+
+            return response()->json([
+                'message' => 'تم تسجيل الجلسة اليدوية وإدخال الإيراد في الخزنة والشيفت بنجاح',
+                'session' => $session,
+                'receipt' => [
+                    'business_name' => 'AL5AL Gaming & Billiards Lounge',
+                    'business_name_ar' => 'صالة الخال للألعاب والبلياردو والكافيه',
+                    'slogan' => 'Enjoy The Game - استمتع بأفضل تجربة لعب وتحدي',
+                    'phones' => '01032890430 (Karim) / 01289535503 (Al-Ghareeb) / 0502943796',
+                    'session_id' => $session->id,
+                    'order_number' => 'MANUAL-' . $session->id,
+                    'date_time' => Carbon::now()->format('Y-m-d H:i'),
+                    'staff_name' => $request->user()?->name ?? 'كاشير الصالة',
+                    'order_type' => 'gaming_room',
+                    'device_name' => $devName,
+                    'room_name' => $roomName,
+                    'customer_name' => $session->customer_name,
+                    'duration_minutes' => $session->duration_minutes,
+                    'start_time' => $startTimeFormatted,
+                    'end_time' => $endTimeFormatted,
+                    'session_cost' => (float)$session->session_cost,
+                    'beverage_cost' => (float)$session->beverage_cost,
+                    'discount' => (float)$session->discount,
+                    'total_amount' => (float)$session->total_amount,
+                    'payment_method' => $session->payment_method,
+                    'payment_status' => $session->payment_status,
+                    'subtotal' => (float) ($session->session_cost + $session->beverage_cost),
+                    'tax' => 0,
+                    'items' => $receiptItems,
+                    'footer_note' => 'Thank you for visiting AL5AL! Enjoy The Game',
+                    'footer_note_ar' => 'شكراً لزيارتكم صالة الخال! استمتعوا باللعب',
+                ]
+            ], 201);
         } catch (\Throwable $e) {
             \Log::error('addManualSession failure: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json([
                 'message' => 'تعذر تسجيل الجلسة اليدوية: ' . $e->getMessage()
             ], 422);
         }
-
-        $session = $result['session'];
-        $receiptItems = $session->orders
-            ->flatMap(fn ($order) => $order->items ?? collect())
-            ->map(fn ($item) => [
-                'name' => $item->product?->name ?? 'صنف',
-                'name_ar' => $item->product?->name_ar ?? $item->product?->name ?? 'صنف',
-                'quantity' => (int) $item->quantity,
-                'unit_price' => (float) $item->unit_price,
-                'subtotal' => (float) $item->subtotal,
-            ])->values()->all();
-
-        return response()->json([
-            'message' => 'تم تسجيل الجلسة اليدوية وإدخال الإيراد في الخزنة والشيفت بنجاح',
-            'session' => $session,
-            'receipt' => [
-                'business_name' => 'AL5AL Gaming & Billiards Lounge',
-                'business_name_ar' => 'صالة الخال للألعاب والبلياردو والكافيه',
-                'slogan' => 'Enjoy The Game - استمتع بأفضل تجربة لعب وتحدي',
-                'phones' => '01032890430 (Karim) / 01289535503 (Al-Ghareeb) / 0502943796',
-                'session_id' => $session->id,
-                'order_number' => 'MANUAL-' . $session->id,
-                'date_time' => Carbon::now()->format('Y-m-d H:i'),
-                'staff_name' => $request->user()?->name ?? 'كاشير الصالة',
-                'order_type' => 'gaming_room',
-                'device_name' => $session->device->device_name,
-                'room_name' => $session->device->room_name,
-                'customer_name' => $session->customer_name,
-                'duration_minutes' => $session->duration_minutes,
-                'start_time' => $session->start_time->format('Y-m-d H:i'),
-                'end_time' => $session->end_time->format('Y-m-d H:i'),
-                'session_cost' => (float)$session->session_cost,
-                'beverage_cost' => (float)$session->beverage_cost,
-                'discount' => (float)$session->discount,
-                'total_amount' => (float)$session->total_amount,
-                'payment_method' => $session->payment_method,
-                'payment_status' => $session->payment_status,
-                'subtotal' => (float) ($session->session_cost + $session->beverage_cost),
-                'tax' => 0,
-                'items' => $receiptItems,
-                'footer_note' => 'Thank you for visiting AL5AL! Enjoy The Game',
-                'footer_note_ar' => 'شكراً لزيارتكم صالة الخال! استمتعوا باللعب',
-            ]
-        ], 201);
     }
 }

@@ -85,12 +85,20 @@ class ApiService {
       throw new Error('استجابة غير صالحة من الخادم: يجب أن يكون مسار API متصلًا بـ Laravel وليس صفحة الواجهة');
     }
     if (!response.ok) {
-      let errorMsg = `HTTP Error ${response.status}`;
+      let errorMsg = `خطأ في الاتصال بالخادم (${response.status})`;
       try {
         const errorData = await response.json();
-        errorMsg = errorData.message || JSON.stringify(errorData);
+        if (errorData.message === 'Server Error' || errorData.message === 'Internal Server Error') {
+          errorMsg = errorData.error_detail 
+            ? `خطأ داخلي في الخادم: ${errorData.error_detail}`
+            : 'حدث خطأ في معالجة الطلب داخل الخادم. تم تسجيل الخطأ، يرجى المحاولة مرة أخرى أو التأكد من سلامة البيانات المدخلة.';
+        } else {
+          errorMsg = errorData.message || errorData.error || (typeof errorData === 'object' ? JSON.stringify(errorData) : `HTTP Error ${response.status}`);
+        }
       } catch {
-        // use default
+        if (response.status === 500) {
+          errorMsg = 'تعذر معالجة الطلب على السيرفر (500). يرجى مراجعة الاتصال وإعادة المحاولة.';
+        }
       }
       throw new Error(errorMsg);
     }
