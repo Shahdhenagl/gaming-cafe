@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CustomerDebtPayment;
 use App\Models\DeviceSession;
 use App\Models\Expense;
 use App\Models\Order;
@@ -13,6 +14,7 @@ use App\Models\TreasuryEntry;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class ShiftController extends Controller
 {
@@ -79,12 +81,20 @@ class ShiftController extends Controller
 
         $ordersCash = (float) $orders->where('payment_method', 'cash')->where('payment_status', 'paid')->sum('total_amount');
         $sessionsCash = (float) $sessions->where('payment_method', 'cash')->where('payment_status', 'paid')->sum(fn ($session) => $this->sessionRevenue($session));
-        $debtCash = (float) Payment::where('shift_id', $shift->id)
-            ->whereNull('order_id')
-            ->whereNull('device_session_id')
-            ->where('payment_method', 'cash')
-            ->where('status', 'confirmed')
-            ->sum('amount');
+        $debtCash = 0;
+        if (Schema::hasTable('customer_debt_payments')) {
+            $debtCash = (float) CustomerDebtPayment::whereBetween('created_at', [$shift->start_time, Carbon::now()])
+                ->where('payment_method', 'cash')
+                ->sum('amount');
+        }
+        if ($debtCash <= 0) {
+            $debtCash = (float) Payment::where('shift_id', $shift->id)
+                ->whereNull('order_id')
+                ->whereNull('device_session_id')
+                ->where('payment_method', 'cash')
+                ->where('status', 'confirmed')
+                ->sum('amount');
+        }
         $cashRevenue = $ordersCash + $sessionsCash + $debtCash;
         $cashExpenses = (float) $expenses->where('payment_method', 'cash')->sum('amount');
         $cashTotal = max(0, $cashRevenue - $cashExpenses);
@@ -205,12 +215,20 @@ class ShiftController extends Controller
         $netProfit = (float) $totalRevenue - $beverageCost - (float) $expenses->sum('amount');
         $ordersCash = (float) $orders->where('payment_method', 'cash')->where('payment_status', 'paid')->sum('total_amount');
         $sessionsCash = (float) $sessions->where('payment_method', 'cash')->where('payment_status', 'paid')->sum(fn ($session) => $this->sessionRevenue($session));
-        $debtCash = (float) Payment::where('shift_id', $shift->id)
-            ->whereNull('order_id')
-            ->whereNull('device_session_id')
-            ->where('payment_method', 'cash')
-            ->where('status', 'confirmed')
-            ->sum('amount');
+        $debtCash = 0;
+        if (Schema::hasTable('customer_debt_payments')) {
+            $debtCash = (float) CustomerDebtPayment::whereBetween('created_at', [$shift->start_time, Carbon::now()])
+                ->where('payment_method', 'cash')
+                ->sum('amount');
+        }
+        if ($debtCash <= 0) {
+            $debtCash = (float) Payment::where('shift_id', $shift->id)
+                ->whereNull('order_id')
+                ->whereNull('device_session_id')
+                ->where('payment_method', 'cash')
+                ->where('status', 'confirmed')
+                ->sum('amount');
+        }
         $cashRevenue = $ordersCash + $sessionsCash + $debtCash;
         $cashExpenses = (float) $expenses->where('payment_method', 'cash')->sum('amount');
         $cashTotal = max(0, $cashRevenue - $cashExpenses);
@@ -254,7 +272,8 @@ class ShiftController extends Controller
         foreach (['cash', 'visa', 'wallet', 'instapay', 'installment', 'other'] as $method) {
             $income = Payment::where('status', 'confirmed')->where('payment_method', $method)
                 ->where(function ($query) use ($shift) {
-                    $query->whereHas('order', fn ($order) => $order->where('shift_id', $shift->id))
+                    $query->where('shift_id', $shift->id)
+                        ->orWhereHas('order', fn ($order) => $order->where('shift_id', $shift->id))
                         ->orWhereHas('deviceSession', fn ($session) => $session->where('shift_id', $shift->id));
                 })->sum('amount');
             // Inventory purchases were already withdrawn from the main vault at restock time.

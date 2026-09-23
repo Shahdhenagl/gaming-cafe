@@ -250,103 +250,134 @@ class SessionController extends Controller
      */
     public function end(Request $request, $id)
     {
-        $session = DeviceSession::with(['device', 'orders.items.product'])->findOrFail($id);
+        try {
+            $session = DeviceSession::with(['device', 'orders.items.product'])->findOrFail($id);
 
-        $request->validate([
-            'payment_method' => 'required|in:cash,visa,wallet,instapay,installment,credit,other',
-            'discount' => 'nullable|numeric|min:0',
-            'amount_paid' => 'nullable|numeric|min:0',
-            'customer_name' => 'required_if:payment_method,credit|string|max:255',
-            'customer_phone' => 'required_if:payment_method,credit|string|max:40',
-        ]);
-
-        $paymentMethod = $request->payment_method;
-        $discount = $request->filled('discount') ? (float)$request->discount : (float)$session->discount;
-        $elapsedMinutes = $session->is_open_ended
-            ? max(1, (int)ceil(Carbon::parse($session->start_time)->diffInSeconds(Carbon::now()) / 60))
-            : $session->duration_minutes;
-        $sessionCost = $session->is_open_ended
-            ? round(($elapsedMinutes / 60) * (float)$session->hourly_rate, 2)
-            : (float)$session->session_cost;
-        $finalTotal = max(0, $sessionCost + $session->beverage_cost - $discount);
-        $amountPaid = $request->filled('amount_paid') ? (float)$request->amount_paid : $finalTotal;
-
-        DB::transaction(function () use ($session, $paymentMethod, $discount, $finalTotal, $amountPaid, $elapsedMinutes, $sessionCost, $request) {
-            $customer = $paymentMethod === 'credit'
-                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name])
-                : null;
-            $session->update([
-                'status' => 'ended',
-                'end_time' => Carbon::now(),
-                'duration_minutes' => $elapsedMinutes,
-                'session_cost' => $sessionCost,
-                'discount' => $discount,
-                'total_amount' => $finalTotal,
-                'paid_amount' => $paymentMethod === 'credit' ? 0 : $amountPaid,
-                'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
-                'payment_method' => $paymentMethod,
+            $request->validate([
+                'payment_method' => 'required|in:cash,visa,wallet,instapay,installment,credit,other',
+                'discount' => 'nullable|numeric|min:0',
+                'amount_paid' => 'nullable|numeric|min:0',
+                'customer_name' => 'required_if:payment_method,credit|string|max:255',
+                'customer_phone' => 'required_if:payment_method,credit|string|max:40',
             ]);
 
-            // Release Device
-            $session->device->update(['status' => 'available']);
+            $paymentMethod = $request->payment_method;
+            $discount = $request->filled('discount') ? (float)$request->discount : (float)$session->discount;
+            $elapsedMinutes = $session->is_open_ended
+                ? max(1, (int)ceil(Carbon::parse($session->start_time)->diffInSeconds(Carbon::now()) / 60))
+                : ($session->duration_minutes ?: 60);
+            $sessionCost = $session->is_open_ended
+                ? round(($elapsedMinutes / 60) * (float)$session->hourly_rate, 2)
+                : (float)$session->session_cost;
+            $finalTotal = max(0, $sessionCost + (float)$session->beverage_cost - $discount);
+            $amountPaid = $request->filled('amount_paid') ? (float)$request->amount_paid : $finalTotal;
 
-            // Update associated orders to paid
-            $session->orders()->update([
-                'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
-                'payment_method' => $paymentMethod,
-                ...($customer ? ['customer_id' => $customer->id] : []),
+            DB::transaction(function () use ($session, $paymentMethod, $discount, $finalTotal, $amountPaid, $elapsedMinutes, $sessionCost, $request) {
+                $customer = null;
+                if ($paymentMethod === 'credit') {
+                    $phone = trim((string)$request->customer_phone);
+                    $name = trim((string)$request->customer_name) ?: 'عميل آجل';
+                    if (empty($phone)) {
+                        $phone = '010' . str_pad((string)$session->id, 8, '0', STR_PAD_LEFT);
+                    }
+                    $customer = Customer::updateOrCreate(['phone' => $phone], ['name' => $name]);
+                }
+
+                $session->update([
+                    'status' => 'ended',
+                    'end_time' => Carbon::now(),
+                    'duration_minutes' => $elapsedMinutes,
+                    'session_cost' => $sessionCost,
+                    'discount' => $discount,
+                    'total_amount' => $finalTotal,
+                    'paid_amount' => $paymentMethod === 'credit' ? 0 : $amountPaid,
+                    'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
+                    'payment_method' => $paymentMethod,
+                ]);
+
+                // Release Device
+                if ($session->device) {
+                    $session->device->update(['status' => 'available']);
+                }
+
+                // Update associated orders to paid
+                $session->orders()->update([
+                    'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
+                    'payment_method' => $paymentMethod,
+                    ...($customer ? ['customer_id' => $customer->id] : []),
+                ]);
+
+                if ($paymentMethod === 'credit' && $customer) {
+                    CustomerDebt::create([
+                        'customer_id' => $customer->id,
+                        'device_session_id' => $session->id,
+                        'shift_id' => $session->shift_id,
+                        'amount' => $finalTotal,
+                        'description' => 'جلسة ألعاب ' . ($session->device?->device_name ?? ('جهاز #' . $session->device_id)),
+                    ]);
+                } else {
+                    Payment::create([
+                        'device_session_id' => $session->id,
+                        'shift_id' => $session->shift_id,
+                        'amount' => $amountPaid,
+                        'payment_method' => $paymentMethod,
+                        'status' => 'confirmed'
+                    ]);
+                }
+            });
+
+            $receiptItems = $session->orders
+                ->flatMap(fn ($order) => $order->items ?? collect())
+                ->map(fn ($item) => [
+                    'name' => $item->product?->name ?? 'Item',
+                    'name_ar' => $item->product?->name_ar ?? $item->product?->name ?? 'صنف',
+                    'quantity' => (int) $item->quantity,
+                    'unit_price' => (float) $item->unit_price,
+                    'subtotal' => (float) $item->subtotal,
+                ])->values()->all();
+            $firstOrder = $session->orders->first();
+
+            return response()->json([
+                'message' => 'Gaming session ended and settled successfully',
+                'receipt' => [
+                    'business_name' => 'AL5AL Gaming & Billiards Lounge',
+                    'business_name_ar' => 'صالة الخال للألعاب والبلياردو والكافيه',
+                    'slogan' => 'Enjoy The Game - استمتع بأفضل تجربة لعب وتحدي',
+                    'phones' => '01032890430 (Karim) / 01289535503 (Al-Ghareeb) / 0502943796',
+                    'session_id' => $session->id,
+                    'order_number' => $firstOrder?->order_number ?? ('SESSION-' . $session->id),
+                    'date_time' => Carbon::now()->format('Y-m-d H:i'),
+                    'staff_name' => $request->user()?->name ?? 'كاشير الصالة',
+                    'order_type' => 'gaming_room',
+                    'device_name' => $session->device?->device_name ?? 'جهاز ألعاب',
+                    'room_name' => $session->device?->room_name ?? 'صالة الألعاب',
+                    'customer_name' => $session->customer_name,
+                    'duration_minutes' => $session->duration_minutes,
+                    'start_time' => $session->start_time ? $session->start_time->format('Y-m-d H:i') : Carbon::now()->format('Y-m-d H:i'),
+                    'end_time' => Carbon::now()->format('Y-m-d H:i'),
+                    'session_cost' => (float)$session->session_cost,
+                    'beverage_cost' => (float)$session->beverage_cost,
+                    'discount' => (float)$discount,
+                    'total_amount' => (float)$finalTotal,
+                    'payment_method' => $paymentMethod,
+                    'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
+                    'subtotal' => (float) ($sessionCost + (float)$session->beverage_cost),
+                    'tax' => 0,
+                    'items' => $receiptItems,
+                    'footer_note' => 'Thank you for visiting AL5AL! Enjoy The Game',
+                    'footer_note_ar' => 'شكراً لزيارتكم صالة الخال! استمتعوا باللعب',
+                    'orders' => $session->orders,
+                ]
             ]);
-
-            if ($paymentMethod === 'credit' && $customer) {
-                CustomerDebt::create(['customer_id' => $customer->id, 'device_session_id' => $session->id, 'shift_id' => $session->shift_id, 'amount' => $finalTotal, 'description' => 'جلسة ألعاب ' . $session->device->device_name]);
-            } else {
-                Payment::create(['device_session_id' => $session->id, 'shift_id' => $session->shift_id, 'amount' => $amountPaid, 'payment_method' => $paymentMethod, 'status' => 'confirmed']);
-            }
-        });
-
-        $receiptItems = $session->orders
-            ->flatMap(fn ($order) => $order->items ?? collect())
-            ->map(fn ($item) => [
-                'name' => $item->product?->name ?? 'Item',
-                'name_ar' => $item->product?->name_ar ?? $item->product?->name ?? 'صنف',
-                'quantity' => (int) $item->quantity,
-                'unit_price' => (float) $item->unit_price,
-                'subtotal' => (float) $item->subtotal,
-            ])->values()->all();
-        $firstOrder = $session->orders->first();
-
-        return response()->json([
-            'message' => 'Gaming session ended and settled successfully',
-            'receipt' => [
-                'business_name' => 'AL5AL Gaming & Billiards Lounge',
-                'business_name_ar' => 'صالة الخال للألعاب والبلياردو والكافيه',
-                'slogan' => 'Enjoy The Game - استمتع بأفضل تجربة لعب وتحدي',
-                'phones' => '01032890430 (Karim) / 01289535503 (Al-Ghareeb) / 0502943796',
-                'session_id' => $session->id,
-                'order_number' => $firstOrder?->order_number ?? ('SESSION-' . $session->id),
-                'date_time' => Carbon::now()->format('Y-m-d H:i'),
-                'staff_name' => $request->user()?->name ?? 'كاشير الصالة',
-                'order_type' => 'gaming_room',
-                'device_name' => $session->device->device_name,
-                'room_name' => $session->device->room_name,
-                'customer_name' => $session->customer_name,
-                'duration_minutes' => $session->duration_minutes,
-                'start_time' => $session->start_time->format('Y-m-d H:i'),
-                'end_time' => Carbon::now()->format('Y-m-d H:i'),
-                'session_cost' => (float)$session->session_cost,
-                'beverage_cost' => (float)$session->beverage_cost,
-                'discount' => (float)$discount,
-                'total_amount' => (float)$finalTotal,
-                'payment_method' => $paymentMethod,
-                'payment_status' => $paymentMethod === 'credit' ? 'unpaid' : 'paid',
-                'subtotal' => (float) ($sessionCost + $session->beverage_cost),
-                'tax' => 0,
-                'items' => $receiptItems,
-                'footer_note' => 'Thank you for visiting AL5AL! Enjoy The Game',
-                'footer_note_ar' => 'شكراً لزيارتكم صالة الخال! استمتعوا باللعب',
-                'orders' => $session->orders,
-            ]
-        ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            throw $ve;
+        } catch (\Throwable $e) {
+            \Log::error('Error ending gaming session: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'message' => 'تعذر إنهاء الجلسة بسبب خطأ في البيانات أو اتصال الخادم: ' . $e->getMessage(),
+                'error_detail' => $e->getMessage()
+            ], 422);
+        }
     }
 
     /**

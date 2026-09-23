@@ -166,6 +166,7 @@ class OrderController extends Controller
             if ($paymentStatus === 'paid') {
                 Payment::create([
                     'order_id' => $order->id,
+                    'shift_id' => $shift ? $shift->id : null,
                     'amount' => $totalAmount,
                     'payment_method' => $paymentMethod,
                     'status' => 'confirmed',
@@ -221,7 +222,14 @@ class OrderController extends Controller
             if ($request->payment_method === 'credit') {
                 CustomerDebt::create(['customer_id' => $customer->id, 'order_id' => $order->id, 'shift_id' => $order->shift_id, 'amount' => $amount, 'description' => 'فاتورة ' . $order->order_number]);
             } else {
-                Payment::create(['order_id' => $order->id, 'amount' => $amount, 'payment_method' => $request->payment_method, 'status' => 'confirmed']);
+                $activeShift = Shift::where('status', 'active')->latest()->first();
+                Payment::create([
+                    'order_id' => $order->id,
+                    'shift_id' => $order->shift_id ?? $activeShift?->id,
+                    'amount' => $amount,
+                    'payment_method' => $request->payment_method,
+                    'status' => 'confirmed',
+                ]);
             }
 
             // If dine-in, free table
