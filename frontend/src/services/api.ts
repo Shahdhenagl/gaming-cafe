@@ -15,12 +15,7 @@ import {
 import { mockStore } from './mockStore';
 
 const API_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-const isLocalhost = typeof window !== 'undefined' && (
-  window.location.hostname === 'localhost' ||
-  window.location.hostname === '127.0.0.1' ||
-  window.location.hostname.startsWith('192.168.') ||
-  window.location.hostname.startsWith('10.')
-);
+const isDev = Boolean(import.meta.env.DEV);
 const isSameOriginApi = typeof window !== 'undefined' && Boolean(API_URL) && (() => {
   try {
     return new URL(API_URL, window.location.origin).hostname === window.location.hostname;
@@ -28,12 +23,22 @@ const isSameOriginApi = typeof window !== 'undefined' && Boolean(API_URL) && (()
     return false;
   }
 })();
-// A Vercel static deployment is not the Laravel API. Never POST to its /api rewrite.
 const hasRemoteBackend = Boolean(API_URL && !API_URL.startsWith('/') && !isSameOriginApi);
-const useBackendApi = import.meta.env.VITE_USE_BACKEND_API === 'true';
-// Production is always the combined Laravel + React deployment. Mock mode is local-only.
-const isStandalone = !useBackendApi && !hasRemoteBackend && isLocalhost;
-const BASE_URL = hasRemoteBackend ? API_URL : (isLocalhost ? 'http://127.0.0.1:8000/api' : '/api');
+const isDevServer = typeof window !== 'undefined' && window.location.port === '5173';
+
+// In production, the React SPA is hosted directly on Laravel (e.g. port 8000 or same origin).
+// Using relative '/api' ensures that requests from the cashier PC, tablet (192.168.x.x), or domain always resolve correctly.
+const BASE_URL = (() => {
+  if (hasRemoteBackend) return API_URL;
+  if (isDevServer) {
+    return `${window.location.protocol}//${window.location.hostname}:8000/api`;
+  }
+  return '/api';
+})();
+
+// Standalone mock is strictly for local dev testing without a running backend.
+// In production builds, it is ALWAYS false to guarantee 100% real database operations.
+const isStandalone = isDev && (import.meta.env.VITE_USE_MOCK === 'true');
 
 class ApiService {
   private token: string | null = localStorage.getItem('nexus_token');
@@ -107,7 +112,7 @@ class ApiService {
   }
 
   private canUseMockFallback(error: unknown): boolean {
-    return isLocalhost || Boolean(this.token?.startsWith('mock-')) || error instanceof TypeError;
+    return isDev && Boolean(this.token?.startsWith('mock-'));
   }
 
   // --- Auth ---
@@ -514,7 +519,7 @@ class ApiService {
     try {
       return await this.request(`/tables/${tableId}/occupy`, { method: 'PATCH' });
     } catch (error) {
-      if (isLocalhost) return mockStore.occupyTable(tableId);
+      if (this.canUseMockFallback(error)) return mockStore.occupyTable(tableId);
       throw error;
     }
   }
@@ -531,7 +536,7 @@ class ApiService {
         body: JSON.stringify({ device_session_id }),
       });
     } catch (error) {
-      if (isLocalhost) return { message: 'تم نقل الطاولة للعبة بنجاح' };
+      if (this.canUseMockFallback(error)) return { message: 'تم نقل الطاولة للعبة بنجاح' };
       throw error;
     }
   }
@@ -544,7 +549,7 @@ class ApiService {
         body: JSON.stringify({ items }),
       });
     } catch (error) {
-      if (isLocalhost) return mockStore.addBeverageToTable(tableId, items);
+      if (this.canUseMockFallback(error)) return mockStore.addBeverageToTable(tableId, items);
       throw error;
     }
   }
@@ -566,7 +571,7 @@ class ApiService {
         body: JSON.stringify(data),
       });
     } catch (error) {
-      if (isLocalhost) {
+      if (this.canUseMockFallback(error)) {
         const res = mockStore.releaseTable(tableId, data.payment_method || 'cash');
         return { message: res.message, table: (mockStore as any).data.tables.find((t: any) => t.id === tableId) };
       }
@@ -625,7 +630,7 @@ class ApiService {
     try {
       return await this.request<{ notifications: NotificationItem[]; unread_count: number }>('/notifications');
     } catch (error) {
-      if (isLocalhost) return mockStore.getNotifications();
+      if (this.canUseMockFallback(error)) return mockStore.getNotifications();
       throw error;
     }
   }
@@ -635,7 +640,7 @@ class ApiService {
     try {
       return await this.request(`/notifications/${id}/read`, { method: 'PATCH' });
     } catch (error) {
-      if (isLocalhost) return mockStore.markNotificationAsRead(id);
+      if (this.canUseMockFallback(error)) return mockStore.markNotificationAsRead(id);
       throw error;
     }
   }
@@ -645,7 +650,7 @@ class ApiService {
     try {
       return await this.request('/notifications/read-all', { method: 'POST' });
     } catch (error) {
-      if (isLocalhost) return mockStore.markAllNotificationsAsRead();
+      if (this.canUseMockFallback(error)) return mockStore.markAllNotificationsAsRead();
       throw error;
     }
   }
@@ -677,7 +682,7 @@ class ApiService {
       const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
       return await this.request(`/reports/dashboard${query}`);
     } catch (error) {
-      if (isLocalhost) return mockStore.getDashboardReport();
+      if (this.canUseMockFallback(error)) return mockStore.getDashboardReport();
       throw error;
     }
   }
@@ -728,7 +733,7 @@ class ApiService {
     try {
       return await this.request(`/reports/analytics?period=${period}`);
     } catch (error) {
-      if (isLocalhost) return mockStore.getAnalytics(days);
+      if (this.canUseMockFallback(error)) return mockStore.getAnalytics(days);
       throw error;
     }
   }
