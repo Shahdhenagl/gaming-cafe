@@ -34,8 +34,8 @@ ENV PORT=80 \
     APP_ENV=production \
     APP_KEY=base64:Iy2KK+X+SKHhyCX9LbVAtN7kj+2tHyFhffaV3XdE/Vs= \
     APP_DEBUG=false \
-    DB_CONNECTION=sqlite \
-    DB_DATABASE=/app/database/database.sqlite \
+    DB_CONNECTION=pgsql \
+    DB_DATABASE=postgres \
     LOG_CHANNEL=stderr \
     CACHE_STORE=array \
     SESSION_DRIVER=array \
