@@ -280,7 +280,7 @@ class SessionController extends Controller
                     if (empty($phone)) {
                         $phone = '010' . str_pad((string)$session->id, 8, '0', STR_PAD_LEFT);
                     }
-                    $customer = Customer::updateOrCreate(['phone' => $phone], ['name' => $name]);
+                    $customer = Customer::updateOrCreate(['phone' => $phone], ['name' => $name, 'is_archived' => false]);
                 }
 
                 $session->update([
@@ -313,6 +313,8 @@ class SessionController extends Controller
                         'device_session_id' => $session->id,
                         'shift_id' => $session->shift_id,
                         'amount' => $finalTotal,
+                        'paid_amount' => 0,
+                        'status' => 'open',
                         'description' => 'جلسة ألعاب ' . ($session->device?->device_name ?? ('جهاز #' . $session->device_id)),
                     ]);
                 } else {

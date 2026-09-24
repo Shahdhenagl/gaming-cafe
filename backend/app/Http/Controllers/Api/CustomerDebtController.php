@@ -53,6 +53,16 @@ class CustomerDebtController extends Controller
         }
 
         $allQueried = $query->limit(500)->get()->map(function ($customer) {
+            // Normalize every debt row explicitly. Do not depend only on the
+            // model accessor, because some production deployments cache or
+            // serialize appended attributes differently.
+            $customer->setRelation('debts', $customer->debts->map(function ($debt) {
+                $amount = (float) ($debt->amount ?? 0);
+                $paid = (float) ($debt->paid_amount ?? 0);
+                $debt->remaining_amount = round(max(0, $amount - $paid), 2);
+                return $debt;
+            })->values());
+
             $customer->total_debt = round((float) $customer->debts->sum('amount'), 2);
             $customer->total_paid = round((float) $customer->debts->sum('paid_amount'), 2);
             $customer->remaining_debt = round(max(0, $customer->total_debt - $customer->total_paid), 2);

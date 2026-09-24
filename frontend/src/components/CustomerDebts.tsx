@@ -67,6 +67,14 @@ export const CustomerDebts: React.FC = () => {
     void load();
   }, [currentTab]);
 
+  // Reload when this screen becomes visible again (for example after saving
+  // a credit order or settling a table in another tab).
+  useEffect(() => {
+    const refresh = () => void load();
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, [currentTab, search]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void load();
@@ -602,4 +610,3 @@ export const CustomerDebts: React.FC = () => {
     </div>
   );
 };
-

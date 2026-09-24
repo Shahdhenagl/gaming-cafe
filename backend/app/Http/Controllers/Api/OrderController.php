@@ -104,7 +104,7 @@ class OrderController extends Controller
             $paymentMethod = $request->payment_method ?? 'cash';
             $paymentStatus = $paymentMethod === 'credit' ? 'unpaid' : ($request->order_type === 'take_away' ? 'paid' : ($request->payment_status ?? 'unpaid'));
             $customer = $paymentMethod === 'credit'
-                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name])
+                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name, 'is_archived' => false])
                 : null;
 
             $order = Order::create([
@@ -179,6 +179,8 @@ class OrderController extends Controller
                     'order_id' => $order->id,
                     'shift_id' => $shift?->id,
                     'amount' => $totalAmount,
+                    'paid_amount' => 0,
+                    'status' => 'open',
                     'description' => 'فاتورة ' . $order->order_number,
                 ]);
             }
@@ -401,4 +403,3 @@ class OrderController extends Controller
         return $this->updateItem($request, $id);
     }
 }
-

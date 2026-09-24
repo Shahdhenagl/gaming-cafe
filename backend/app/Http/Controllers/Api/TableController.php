@@ -298,7 +298,7 @@ class TableController extends Controller
 
         DB::transaction(function () use ($table, $order, $shift, $paymentMethod, $discount, $finalTotal, $amountPaid, $request) {
             $customer = $paymentMethod === 'credit'
-                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name])
+                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name, 'is_archived' => false])
                 : null;
 
             if ($order) {
@@ -317,6 +317,8 @@ class TableController extends Controller
                         'order_id' => $order->id,
                         'shift_id' => $shift?->id,
                         'amount' => $finalTotal,
+                        'paid_amount' => 0,
+                        'status' => 'open',
                         'description' => 'حساب طاولة ' . $table->table_number,
                     ]);
                 } else if ($finalTotal > 0) {
