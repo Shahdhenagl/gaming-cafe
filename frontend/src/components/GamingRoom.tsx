@@ -315,8 +315,8 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
       return;
     }
 
-    if (manualPaymentMethod === 'credit' && (!manualCustomerName.trim() || !manualCustomerPhone.trim())) {
-      setManualError('يرجى كتابة اسم العميل ورقم الهاتف للآجل');
+    if (manualPaymentMethod === 'credit' && !manualCustomerName.trim()) {
+      setManualError('يرجى كتابة اسم العميل للآجل. رقم الهاتف اختياري');
       return;
     }
 
