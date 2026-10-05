@@ -183,7 +183,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
 
   const settlementSessionCost = endModalDevice?.active_session
     ? endModalDevice.active_session.is_open_ended
-      ? Math.round(((countdowns[endModalDevice.id] || 0) / 60) * (endModalDevice.hourly_rate / 60) * 100) / 100
+      ? Math.floor((Math.round(((countdowns[endModalDevice.id] || 0) / 60) * (endModalDevice.hourly_rate / 60) * 100) / 100) / 5) * 5
       : safeNum(endModalDevice.active_session.session_cost)
     : 0;
 

@@ -269,6 +269,12 @@ class SessionController extends Controller
             $sessionCost = $session->is_open_ended
                 ? round(($elapsedMinutes / 60) * (float)$session->hourly_rate, 2)
                 : (float)$session->session_cost;
+            // Open-ended gaming time is charged in whole 5 EGP units, always
+            // rounding down: 52/54 => 50 and 57/59 => 55. Store this rounded
+            // value so payments, credit, receipts, shifts, and reports agree.
+            if ($session->is_open_ended) {
+                $sessionCost = floor($sessionCost / 5) * 5;
+            }
             $finalTotal = max(0, $sessionCost + (float)$session->beverage_cost - $discount);
             $amountPaid = $request->filled('amount_paid') ? (float)$request->amount_paid : $finalTotal;
 
