@@ -27,6 +27,7 @@ class CustomerDebtController extends Controller
             $isArchived = true;
         }
 
+        // Keep this read path schema-stable on serverless production.
         $query->where('is_archived', $isArchived);
 
         if ($request->filled('search')) {
