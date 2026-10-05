@@ -1371,7 +1371,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                 const d = devices.find((x) => x.id === manualDeviceId);
                 const dur = manualCustomDuration ? parseInt(manualCustomDuration, 10) : manualDuration;
                 const rate = manualHourlyRate ? parseFloat(manualHourlyRate) : (d?.hourly_rate || 30);
-                const sessionCost = Math.round(((dur / 60) * rate) * 100) / 100;
+                const sessionCost = Math.floor((Math.round(((dur / 60) * rate) * 100) / 100) / 5) * 5;
                 const beverageCost = Object.entries(manualDrinks).reduce((sum, [id, qty]) => {
                   const p = products.find((prod) => prod.id === Number(id));
                   return sum + (p ? p.price * qty : 0);

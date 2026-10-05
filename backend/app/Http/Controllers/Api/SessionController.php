@@ -421,6 +421,9 @@ class SessionController extends Controller
 
             $hourlyRate = $request->filled('hourly_rate') ? (float)$request->hourly_rate : (float)$device->hourly_rate;
             $sessionCost = $request->filled('session_cost') ? (float)$request->session_cost : round(($durationMinutes / 60) * $hourlyRate, 2);
+            // Manual/offline gaming time follows the same cash-unit rule as
+            // open-ended sessions: 39.17 becomes 35, never a fractional EGP.
+            $sessionCost = floor($sessionCost / 5) * 5;
             $discount = (float)($request->discount ?? 0.00);
             $paymentMethod = $request->payment_method;
 
