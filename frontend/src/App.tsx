@@ -69,6 +69,15 @@ export function App() {
     localStorage.setItem('nexus_theme', isLightMode ? 'light' : 'dark');
   }, [isLightMode]);
 
+  useEffect(() => {
+    const requireLogin = () => {
+      setUser(null);
+      setShowLoginModal(true);
+    };
+    window.addEventListener('nexus:auth-required', requireLogin);
+    return () => window.removeEventListener('nexus:auth-required', requireLogin);
+  }, []);
+
   const toggleLanguage = () => {
     setLang((prev) => (prev === 'en' ? 'ar' : 'en'));
   };

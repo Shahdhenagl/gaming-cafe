@@ -93,12 +93,23 @@ class ApiService {
       let errorMsg = `خطأ في الاتصال بالخادم (${response.status})`;
       try {
         const errorData = await response.json();
+        if (response.status === 401 || errorData.message === 'Unauthenticated.') {
+          // The shell can remain visible while an old Sanctum token expires.
+          // Clear it immediately and let App reopen the login dialog instead
+          // of allowing a protected action to fail with a confusing message.
+          this.setToken(null);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('nexus:auth-required'));
+          }
+        }
         if (errorData.message === 'Server Error' || errorData.message === 'Internal Server Error') {
           errorMsg = errorData.error_detail 
             ? `خطأ داخلي في الخادم: ${errorData.error_detail}`
             : 'حدث خطأ في معالجة الطلب داخل الخادم. تم تسجيل الخطأ، يرجى المحاولة مرة أخرى أو التأكد من سلامة البيانات المدخلة.';
         } else {
-          errorMsg = errorData.message || errorData.error || (typeof errorData === 'object' ? JSON.stringify(errorData) : `HTTP Error ${response.status}`);
+          errorMsg = (response.status === 401 || errorData.message === 'Unauthenticated.')
+            ? 'انتهت جلسة الدخول. سجّل الدخول مرة أخرى للمتابعة.'
+            : errorData.message || errorData.error || (typeof errorData === 'object' ? JSON.stringify(errorData) : `HTTP Error ${response.status}`);
         }
       } catch {
         if (response.status === 500) {
