@@ -488,7 +488,10 @@ class SessionController extends Controller
                     'start_time' => $startTime,
                     'end_time' => $endTime,
                     'duration_minutes' => $durationMinutes,
-                    'is_open_ended' => false,
+                    // PostgreSQL expects a boolean expression here. Passing
+                    // PHP false through PDO may bind it as integer 0 on the
+                    // manual-session path, causing SQLSTATE[42804].
+                    'is_open_ended' => DB::raw('FALSE'),
                     'status' => 'ended', // Ended immediately! Device stays available!
                     'hourly_rate' => $hourlyRate,
                     'session_cost' => $sessionCost,
