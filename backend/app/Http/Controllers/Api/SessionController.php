@@ -258,7 +258,7 @@ class SessionController extends Controller
                 'discount' => 'nullable|numeric|min:0',
                 'amount_paid' => 'nullable|numeric|min:0',
                 'customer_name' => 'required_if:payment_method,credit|string|max:255',
-                'customer_phone' => 'required_if:payment_method,credit|string|max:40',
+                'customer_phone' => 'nullable|string|max:40',
             ]);
 
             $paymentMethod = $request->payment_method;

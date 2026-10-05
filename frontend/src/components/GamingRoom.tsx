@@ -252,6 +252,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
     e.preventDefault();
     if (!endModalDevice || !endModalDevice.active_session) return;
     setActionLoading(true);
+    setActionError('');
     try {
       await onEndSession(endModalDevice.active_session.id, {
         payment_method: endPaymentMethod,
@@ -264,6 +265,8 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
       setEndDiscount('0');
       setEndCustomerName('');
       setEndCustomerPhone('');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'تعذر إنهاء الجلسة وتسجيل الدفع');
     } finally {
       setActionLoading(false);
     }
@@ -1116,7 +1119,7 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                 <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
                   <p className="text-xs font-bold text-amber-300">بيانات العميل الآجل مطلوبة</p>
                   <input value={endCustomerName} onChange={(e) => setEndCustomerName(e.target.value)} required placeholder="اسم العميل" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
-                  <input value={endCustomerPhone} onChange={(e) => setEndCustomerPhone(e.target.value)} required placeholder="رقم الهاتف" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
+                  <input value={endCustomerPhone} onChange={(e) => setEndCustomerPhone(e.target.value)} placeholder="رقم الهاتف (اختياري)" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
                 </div>
               )}
 
