@@ -351,6 +351,9 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
       setManualCustomerPhone('');
       setManualDiscount('0');
       onRefresh();
+      if (manualPaymentMethod === 'credit' && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nexus:credit-created'));
+      }
 
       if (res.receipt && onShowReceipt) {
         onShowReceipt(res.receipt);

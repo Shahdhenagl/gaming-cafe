@@ -72,7 +72,13 @@ export const CustomerDebts: React.FC = () => {
   useEffect(() => {
     const refresh = () => void load();
     window.addEventListener('focus', refresh);
-    return () => window.removeEventListener('focus', refresh);
+    window.addEventListener('nexus:credit-created', refresh);
+    const interval = window.setInterval(refresh, 15000);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('nexus:credit-created', refresh);
+      window.clearInterval(interval);
+    };
   }, [currentTab, search]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {

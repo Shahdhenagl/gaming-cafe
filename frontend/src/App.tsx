@@ -211,6 +211,9 @@ export function App() {
   ) => {
     const res = await api.endSession(sessionId, data);
     void refreshOperationalData();
+    if (data.payment_method === 'credit') {
+      window.dispatchEvent(new Event('nexus:credit-created'));
+    }
     if (res && res.receipt) {
       const rawReceipt = res.receipt as ThermalReceipt & { orders?: Order[] };
       const items = Array.isArray(rawReceipt.items)
@@ -229,6 +232,9 @@ export function App() {
   const handlePosCheckout = async (data: any) => {
     const res = await api.createOrder(data);
     void refreshOperationalData();
+    if (data.payment_method === 'credit') {
+      window.dispatchEvent(new Event('nexus:credit-created'));
+    }
 
     // Fetch thermal receipt for order
     let receipt: ThermalReceipt | undefined;
@@ -282,6 +288,9 @@ export function App() {
   ) => {
     const res = await api.checkoutTable(tableId, data);
     void refreshOperationalData();
+    if (data.payment_method === 'credit') {
+      window.dispatchEvent(new Event('nexus:credit-created'));
+    }
     if (res && res.receipt) {
       setReceiptModalData(res.receipt);
     }
