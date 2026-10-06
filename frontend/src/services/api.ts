@@ -40,6 +40,23 @@ const BASE_URL = (() => {
 // In production builds, it is ALWAYS false to guarantee 100% real database operations.
 const isStandalone = isDev && (import.meta.env.VITE_USE_MOCK === 'true');
 
+function stringifyApiValue(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) return value;
+  if (value && typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>;
+    const nestedMessage = stringifyApiValue(objectValue.message);
+    if (nestedMessage) return nestedMessage;
+    const nestedError = stringifyApiValue(objectValue.error);
+    if (nestedError) return nestedError;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 class ApiService {
   private token: string | null = localStorage.getItem('nexus_token');
 
@@ -102,14 +119,17 @@ class ApiService {
             window.dispatchEvent(new Event('nexus:auth-required'));
           }
         }
-        if (errorData.message === 'Server Error' || errorData.message === 'Internal Server Error') {
-          errorMsg = errorData.error_detail 
-            ? `خطأ داخلي في الخادم: ${errorData.error_detail}`
+        const apiMessage = stringifyApiValue(errorData.message);
+        const apiError = stringifyApiValue(errorData.error);
+        if (apiMessage === 'Server Error' || apiMessage === 'Internal Server Error' || response.status >= 500) {
+          const detail = stringifyApiValue(errorData.error_detail);
+          errorMsg = detail
+            ? `خطأ داخلي في الخادم: ${detail}`
             : 'حدث خطأ في معالجة الطلب داخل الخادم. تم تسجيل الخطأ، يرجى المحاولة مرة أخرى أو التأكد من سلامة البيانات المدخلة.';
         } else {
           errorMsg = (response.status === 401 || errorData.message === 'Unauthenticated.')
             ? 'انتهت جلسة الدخول. سجّل الدخول مرة أخرى للمتابعة.'
-            : errorData.message || errorData.error || (typeof errorData === 'object' ? JSON.stringify(errorData) : `HTTP Error ${response.status}`);
+            : apiMessage || apiError || `HTTP Error ${response.status}`;
         }
       } catch {
         if (response.status === 500) {
