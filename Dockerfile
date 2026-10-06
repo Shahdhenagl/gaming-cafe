@@ -1,0 +1,44 @@
+FROM node:22-bookworm AS frontend-build
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+ENV VITE_USE_BACKEND_API=true
+RUN npm run build
+
+FROM dunglas/frankenphp:1-php8.4-bookworm AS php-base
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
+    && install-php-extensions intl zip pdo_pgsql pdo_mysql pdo_sqlite sqlite3
+WORKDIR /app
+
+FROM php-base AS dependencies
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY backend/composer.json backend/composer.lock ./
+RUN composer install --no-dev --no-interaction --no-progress --no-scripts --optimize-autoloader --prefer-dist
+COPY backend/ ./
+COPY --from=frontend-build /app/frontend/dist/ ./public/
+RUN test -f ./public/index.html && ls ./public/assets/index-*.js >/dev/null
+RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache database \
+    && touch database/database.sqlite \
+    && composer dump-autoload --no-dev --classmap-authoritative
+
+FROM php-base AS runtime
+COPY --from=dependencies --chown=www-data:www-data /app /app
+COPY --chown=www-data:www-data Caddyfile /etc/frankenphp/Caddyfile
+COPY --chown=www-data:www-data docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp \
+    && sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && chown -R www-data:www-data /config/caddy /data/caddy /app
+ENV PORT=80 \
+    APP_ENV=production \
+    APP_KEY=base64:Iy2KK+X+SKHhyCX9LbVAtN7kj+2tHyFhffaV3XdE/Vs= \
+    APP_DEBUG=false \
+    DB_CONNECTION=pgsql \
+    DB_DATABASE=postgres \
+    LOG_CHANNEL=stderr \
+    CACHE_STORE=array \
+    SESSION_DRIVER=array \
+    QUEUE_CONNECTION=sync
+USER www-data
+CMD ["/usr/local/bin/docker-entrypoint.sh"]

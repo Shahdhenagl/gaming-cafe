@@ -3,7 +3,7 @@
   "services": {
     "app": {
       "root": ".",
-      "entrypoint": "Dockerfile.container",
+      "entrypoint": "Dockerfile",
       "runtime": "container"
     }
   },
