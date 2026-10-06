@@ -26,34 +26,37 @@ class CustomerDebtController extends Controller
         }
 
         // Keep this read path schema-stable on serverless production.
-        $customerQuery = DB::table('customers')
-            ->select(['id', 'name', 'phone', 'is_archived'])
-            ->where('is_archived', $isArchived)
-            ->orderBy('name');
+        // Read debt rows first and join only the stable customer fields. This
+        // avoids Eloquent relations and optional archive columns in production.
+        $debtQuery = DB::table('customer_debts as d')
+            ->join('customers as c', 'c.id', '=', 'd.customer_id')
+            ->select(['d.id', 'd.customer_id', 'd.order_id', 'd.device_session_id', 'd.shift_id', 'd.amount', 'd.paid_amount', 'd.description', 'd.status', 'd.created_at', 'c.name as customer_name', 'c.phone as customer_phone'])
+            ->orderByDesc('d.created_at');
         if ($request->filled('search')) {
             $search = $request->string('search')->toString();
-            $customerQuery->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"));
+            $debtQuery->where(fn ($q) => $q->where('c.name', 'like', "%{$search}%")->orWhere('c.phone', 'like', "%{$search}%"));
         }
-        $customerRows = $customerQuery->limit(500)->get();
-        $customerIds = $customerRows->pluck('id');
-        $debtRows = $customerIds->isEmpty()
-            ? collect()
-            : DB::table('customer_debts')->whereIn('customer_id', $customerIds)->orderByDesc('created_at')->get();
-        $debtsByCustomer = $debtRows->groupBy('customer_id');
-        $allQueried = $customerRows->map(function ($customer) use ($debtsByCustomer) {
-            $debts = $debtsByCustomer->get($customer->id, collect())->map(function ($debt) {
+        $debtRows = $debtQuery->limit(1000)->get();
+        $allQueried = $debtRows->groupBy('customer_id')->map(function ($rows, $customerId) {
+            $first = $rows->first();
+            $debts = $rows->map(function ($debt) {
                 $debt->amount = (float) ($debt->amount ?? 0);
                 $debt->paid_amount = (float) ($debt->paid_amount ?? 0);
                 $debt->remaining_amount = round(max(0, $debt->amount - $debt->paid_amount), 2);
                 return $debt;
             })->values();
-            $customer->debts = $debts;
+            $customer = (object) [
+                'id' => (int) $customerId,
+                'name' => $first->customer_name,
+                'phone' => $first->customer_phone,
+                'is_archived' => false,
+                'debts' => $debts,
+            ];
             $customer->total_debt = round((float) $debts->sum('amount'), 2);
             $customer->total_paid = round((float) $debts->sum('paid_amount'), 2);
             $customer->remaining_debt = round(max(0, $customer->total_debt - $customer->total_paid), 2);
-            $customer->is_archived = (bool) $customer->is_archived;
             return $customer;
-        });
+        })->sortBy('name')->values();
 
         // Filter based on tab if not in archived mode
         $customers = $allQueried;
@@ -68,7 +71,7 @@ class CustomerDebtController extends Controller
         // Summary counts for tabs
         $activeWithDebtCount = $allQueried->filter(fn($c) => !$c->is_archived && $c->remaining_debt > 0)->count();
         $activeZeroDebtCount = $allQueried->filter(fn($c) => !$c->is_archived && $c->remaining_debt <= 0)->count();
-        $archivedCount = DB::table('customers')->where('is_archived', true)->count();
+        $archivedCount = 0;
 
         return response()->json([
             'customers' => $customers,
