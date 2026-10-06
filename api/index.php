@@ -15,13 +15,16 @@ if (file_exists($maintenance = $backend . '/storage/framework/maintenance.php'))
     require $maintenance;
 }
 
-$autoload = $backend . '/vendor/autoload.php';
-if (!is_file($autoload)) {
-    $autoload = $root . '/vendor/autoload.php';
-}
-require $autoload;
-
 try {
+    $autoload = $backend . '/vendor/autoload.php';
+    if (!is_file($autoload)) {
+        $autoload = $root . '/vendor/autoload.php';
+    }
+    if (!is_file($autoload)) {
+        throw new RuntimeException('Composer autoload file not found');
+    }
+    require $autoload;
+
     $app = require_once $backend . '/bootstrap/app.php';
     $app->handleRequest(Request::capture());
 } catch (Throwable $e) {
