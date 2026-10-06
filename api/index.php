@@ -15,7 +15,11 @@ if (file_exists($maintenance = $backend . '/storage/framework/maintenance.php'))
     require $maintenance;
 }
 
-require $root . '/vendor/autoload.php';
+$autoload = $backend . '/vendor/autoload.php';
+if (!is_file($autoload)) {
+    $autoload = $root . '/vendor/autoload.php';
+}
+require $autoload;
 
 try {
     $app = require_once $backend . '/bootstrap/app.php';
