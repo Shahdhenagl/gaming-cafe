@@ -213,7 +213,7 @@ class OrderController extends Controller
         DB::transaction(function () use ($order, $request, $amount) {
             $customer = null;
             if ($request->payment_method === 'credit') {
-                $customer = Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name]);
+                $customer = Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name, 'is_archived' => false]);
                 $order->update(['customer_id' => $customer->id]);
             }
             $order->update([
