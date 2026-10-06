@@ -10,27 +10,11 @@ use App\Models\Payment;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class CustomerDebtController extends Controller
 {
-    protected function ensureArchivedColumnExists(): void
-    {
-        try {
-            if (Schema::hasTable('customers') && !Schema::hasColumn('customers', 'is_archived')) {
-                Schema::table('customers', function ($table) {
-                    $table->boolean('is_archived')->default(false)->index();
-                });
-            }
-        } catch (\Throwable $e) {
-            // Silently continue if column exists
-        }
-    }
-
     public function index(Request $request)
     {
-        $this->ensureArchivedColumnExists();
-
         $query = Customer::with(['debts' => fn ($q) => $q->latest()])->orderBy('name');
 
         $tab = $request->input('tab', 'active'); // 'active' | 'zero_debt' | 'archived' | 'all'
@@ -43,9 +27,7 @@ class CustomerDebtController extends Controller
             $isArchived = true;
         }
 
-        if (Schema::hasColumn('customers', 'is_archived')) {
-            $query->where('is_archived', $isArchived);
-        }
+        $query->where('is_archived', $isArchived);
 
         if ($request->filled('search')) {
             $search = $request->string('search')->toString();
@@ -83,10 +65,7 @@ class CustomerDebtController extends Controller
         // Summary counts for tabs
         $activeWithDebtCount = $allQueried->filter(fn($c) => !$c->is_archived && $c->remaining_debt > 0)->count();
         $activeZeroDebtCount = $allQueried->filter(fn($c) => !$c->is_archived && $c->remaining_debt <= 0)->count();
-        $archivedCount = 0;
-        if (Schema::hasColumn('customers', 'is_archived')) {
-            $archivedCount = Customer::where('is_archived', true)->count();
-        }
+        $archivedCount = Customer::where('is_archived', true)->count();
 
         return response()->json([
             'customers' => $customers,
@@ -106,7 +85,6 @@ class CustomerDebtController extends Controller
 
     public function archive($id)
     {
-        $this->ensureArchivedColumnExists();
         $customer = Customer::findOrFail($id);
         $customer->update(['is_archived' => true]);
 
@@ -118,7 +96,6 @@ class CustomerDebtController extends Controller
 
     public function restore($id)
     {
-        $this->ensureArchivedColumnExists();
         $customer = Customer::findOrFail($id);
         $customer->update(['is_archived' => false]);
 
