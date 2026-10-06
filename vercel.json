@@ -1,12 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader --no-scripts && npm --prefix frontend install && npm --prefix frontend run build",
+  "buildCommand": "curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/tmp --filename=composer && /tmp/composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader --no-scripts && npm --prefix frontend install && npm --prefix frontend run build",
   "outputDirectory": "frontend/dist",
   "framework": "vite",
   "functions": {
     "api/index.php": {
       "runtime": "vercel-php@0.8.0",
-      "includeFiles": "backend/**"
+      "includeFiles": ["backend/**", "vendor/**"]
     }
   },
   "rewrites": [
