@@ -56,14 +56,19 @@ class SessionController extends Controller
         if (!$isOpenEnded && !$request->filled('duration_minutes')) {
             return response()->json(['message' => 'Choose a duration or select Open-ended mode.'], 422);
         }
-        $duration = $isOpenEnded ? null : (int)$request->duration_minutes;
+        // Keep a database-safe placeholder for open-ended sessions. Older production
+        // schemas may still have duration_minutes NOT NULL; the is_open_ended flag
+        // remains the source of truth and the duration is recalculated on checkout.
+        $duration = $isOpenEnded ? 1 : (int)$request->duration_minutes;
         $hourlyRate = (float)$device->hourly_rate;
         $sessionCost = $isOpenEnded ? 0 : round(($duration / 60) * $hourlyRate, 2);
         $discount = (float)($request->discount ?? 0.00);
         $totalAmount = max(0, $sessionCost - $discount);
 
         $now = Carbon::now();
-        $endTime = $isOpenEnded ? null : (clone $now)->addMinutes($duration);
+        // Some production databases also still require end_time. Use a harmless
+        // placeholder for open sessions; checkout replaces it with the real time.
+        $endTime = (clone $now)->addMinutes($duration);
 
         // Fetch active shift
         $shift = Shift::where('status', 'active')->latest()->first();
@@ -88,10 +93,8 @@ class SessionController extends Controller
                 'paid_amount' => 0.00,
                 'payment_status' => 'unpaid',
             ];
-            // Fixed sessions use the database default FALSE. PDO/pgsql
-            // needs a PostgreSQL expression for the open-session TRUE value.
             if ($isOpenEnded) {
-                $sessionData['is_open_ended'] = DB::raw('TRUE');
+                $sessionData['is_open_ended'] = true;
             }
             $session = DeviceSession::create($sessionData);
 
