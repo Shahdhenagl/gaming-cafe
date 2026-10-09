@@ -104,7 +104,7 @@ class OrderController extends Controller
             $paymentMethod = $request->payment_method ?? 'cash';
             $paymentStatus = $paymentMethod === 'credit' ? 'unpaid' : ($request->order_type === 'take_away' ? 'paid' : ($request->payment_status ?? 'unpaid'));
             $customer = $paymentMethod === 'credit'
-                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name, 'is_archived' => false])
+                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name, 'is_archived' => DB::raw('FALSE')])
                 : null;
 
             $order = Order::create([
@@ -213,7 +213,7 @@ class OrderController extends Controller
         DB::transaction(function () use ($order, $request, $amount) {
             $customer = null;
             if ($request->payment_method === 'credit') {
-                $customer = Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name, 'is_archived' => false]);
+                $customer = Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name, 'is_archived' => DB::raw('FALSE')]);
                 $order->update(['customer_id' => $customer->id]);
             }
             $order->update([

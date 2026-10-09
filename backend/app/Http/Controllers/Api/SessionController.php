@@ -289,7 +289,7 @@ class SessionController extends Controller
                     if (empty($phone)) {
                         $phone = '010' . str_pad((string)$session->id, 8, '0', STR_PAD_LEFT);
                     }
-                    $customer = Customer::updateOrCreate(['phone' => $phone], ['name' => $name, 'is_archived' => false]);
+                    $customer = Customer::updateOrCreate(['phone' => $phone], ['name' => $name, 'is_archived' => DB::raw('FALSE')]);
                 }
 
                 $session->update([
@@ -482,7 +482,7 @@ class SessionController extends Controller
                         try {
                             $customer = Customer::updateOrCreate(
                                 ['phone' => $custPhone],
-                                ['name' => $custName, 'is_archived' => false]
+                                ['name' => $custName, 'is_archived' => DB::raw('FALSE')]
                             );
                         } catch (\Throwable $e) {
                             \Log::warning('Could not auto-create customer for manual session credit: ' . $e->getMessage());

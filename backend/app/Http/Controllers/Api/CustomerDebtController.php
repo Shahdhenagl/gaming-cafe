@@ -92,7 +92,7 @@ class CustomerDebtController extends Controller
     public function archive($id)
     {
         $customer = Customer::findOrFail($id);
-        $customer->update(['is_archived' => true]);
+        $customer->update(['is_archived' => DB::raw('TRUE')]);
 
         return response()->json([
             'message' => 'تم نقل العميل إلى الأرشيف بنجاح. يمكنك استعادته في أي وقت.',
@@ -103,7 +103,7 @@ class CustomerDebtController extends Controller
     public function restore($id)
     {
         $customer = Customer::findOrFail($id);
-        $customer->update(['is_archived' => false]);
+        $customer->update(['is_archived' => DB::raw('FALSE')]);
 
         return response()->json([
             'message' => 'تمت استعادة العميل من الأرشيف بنجاح.',

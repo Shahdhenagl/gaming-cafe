@@ -298,7 +298,7 @@ class TableController extends Controller
 
         DB::transaction(function () use ($table, $order, $shift, $paymentMethod, $discount, $finalTotal, $amountPaid, $request) {
             $customer = $paymentMethod === 'credit'
-                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name, 'is_archived' => false])
+                ? Customer::updateOrCreate(['phone' => $request->customer_phone], ['name' => $request->customer_name, 'is_archived' => DB::raw('FALSE')])
                 : null;
 
             if ($order) {
