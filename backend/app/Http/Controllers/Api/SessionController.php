@@ -94,7 +94,9 @@ class SessionController extends Controller
                 'payment_status' => 'unpaid',
             ];
             if ($isOpenEnded) {
-                $sessionData['is_open_ended'] = true;
+                // PDO/pgsql may bind PHP booleans as integers; use a native
+                // PostgreSQL boolean expression to avoid 42804 datatype errors.
+                $sessionData['is_open_ended'] = DB::raw('TRUE');
             }
             $session = DeviceSession::create($sessionData);
 
