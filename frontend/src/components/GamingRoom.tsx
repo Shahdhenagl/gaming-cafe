@@ -25,6 +25,7 @@ import { Language, translations } from '../i18n/translations';
 import { sounds } from '../utils/audio';
 import { formatSeconds, safeNum, formatMoney } from '../utils/format';
 import { api } from '../services/api';
+import { CustomerAutocomplete } from './CustomerAutocomplete';
 
 interface GamingRoomProps {
   lang: Language;
@@ -1118,8 +1119,13 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
               {endPaymentMethod === 'credit' && (
                 <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
                   <p className="text-xs font-bold text-amber-300">بيانات العميل الآجل مطلوبة</p>
-                  <input value={endCustomerName} onChange={(e) => setEndCustomerName(e.target.value)} required placeholder="اسم العميل" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
-                  <input value={endCustomerPhone} onChange={(e) => setEndCustomerPhone(e.target.value)} placeholder="رقم الهاتف (اختياري)" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
+                  <CustomerAutocomplete
+                    name={endCustomerName}
+                    phone={endCustomerPhone}
+                    onNameChange={setEndCustomerName}
+                    onPhoneChange={setEndCustomerPhone}
+                    phoneRequired
+                  />
                 </div>
               )}
 
@@ -1198,32 +1204,21 @@ export const GamingRoom: React.FC<GamingRoomProps> = ({
                 </select>
               </div>
 
-              {/* Customer Info (Optional) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    اسم العميل (اختياري)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="مثال: أحمد محمد"
-                    value={manualCustomerName}
-                    onChange={(e) => setManualCustomerName(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-white text-xs placeholder-slate-500 focus:outline-none focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    رقم الهاتف (اختياري)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="010XXXXXXXX"
-                    value={manualCustomerPhone}
-                    onChange={(e) => setManualCustomerPhone(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-white text-xs placeholder-slate-500 focus:outline-none focus:border-primary"
-                  />
-                </div>
+              {/* Customer Info */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  بيانات العميل {manualPaymentMethod === 'credit' ? '(مطلوبة للآجل)' : '(اختياري)'}
+                </label>
+                <CustomerAutocomplete
+                  name={manualCustomerName}
+                  phone={manualCustomerPhone}
+                  onNameChange={setManualCustomerName}
+                  onPhoneChange={setManualCustomerPhone}
+                  phoneRequired={manualPaymentMethod === 'credit'}
+                  namePlaceholder="اسم العميل"
+                  phonePlaceholder="رقم الهاتف"
+                  compact
+                />
               </div>
 
               {/* Duration Presets */}

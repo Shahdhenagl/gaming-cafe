@@ -21,6 +21,7 @@ import { Language, translations } from '../i18n/translations';
 import { sounds } from '../utils/audio';
 import { formatMoney } from '../utils/format';
 import { api } from '../services/api';
+import { CustomerAutocomplete } from './CustomerAutocomplete';
 
 interface PosBarProps {
   lang: Language;
@@ -633,8 +634,13 @@ export const PosBar: React.FC<PosBarProps> = ({
               {paymentMethod === 'credit' && (
                 <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
                   <p className="text-xs font-bold text-amber-300">بيانات العميل الآجل مطلوبة</p>
-                  <input value={creditCustomerName} onChange={(e) => setCreditCustomerName(e.target.value)} required placeholder="اسم العميل" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
-                  <input value={creditCustomerPhone} onChange={(e) => setCreditCustomerPhone(e.target.value)} required placeholder="رقم الهاتف" className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-white text-sm" />
+                  <CustomerAutocomplete
+                    name={creditCustomerName}
+                    phone={creditCustomerPhone}
+                    onNameChange={setCreditCustomerName}
+                    onPhoneChange={setCreditCustomerPhone}
+                    phoneRequired
+                  />
                 </div>
               )}
 
