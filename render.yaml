@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: gaming-cafe-demo
+    runtime: static
+    buildCommand: npm --prefix frontend ci --no-audit --no-fund && VITE_USE_MOCK=true npm --prefix frontend run build
+    staticPublishPath: frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

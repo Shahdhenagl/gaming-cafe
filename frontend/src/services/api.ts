@@ -36,9 +36,9 @@ const BASE_URL = (() => {
   return '/api';
 })();
 
-// Standalone mock is strictly for local dev testing without a running backend.
-// In production builds, it is ALWAYS false to guarantee 100% real database operations.
-const isStandalone = isDev && (import.meta.env.VITE_USE_MOCK === 'true');
+// Static demo builds intentionally run entirely from the browser. Keep this
+// behind an explicit build-time flag so production API builds still use Laravel.
+const isStandalone = import.meta.env.VITE_USE_MOCK === 'true';
 
 function stringifyApiValue(value: unknown): string | null {
   if (typeof value === 'string' && value.trim()) return value;
@@ -143,7 +143,7 @@ class ApiService {
   }
 
   private canUseMockFallback(error: unknown): boolean {
-    return isDev && Boolean(this.token?.startsWith('mock-'));
+    return isStandalone || Boolean(this.token?.startsWith('mock-'));
   }
 
   // --- Auth ---
